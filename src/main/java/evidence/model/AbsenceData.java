@@ -1,12 +1,12 @@
-package evidence;
+package evidence.model;
 
 import java.time.LocalDate;
 
 public class AbsenceData {
-    private final String type; // np. UW, CH
+    private final String type;
     private final LocalDate date;
     private final String note;
-    boolean overtimePickup;
+    private boolean overtimePickup;
 
     public AbsenceData(String type, LocalDate date, String note) {
         this.type = type;

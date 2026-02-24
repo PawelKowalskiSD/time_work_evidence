@@ -1,4 +1,4 @@
-package evidence;
+package evidence.util;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -15,23 +15,20 @@ public class PolishHolidays {
     public static Set<LocalDate> getHolidays(int year) {
         Set<LocalDate> holidays = new HashSet<>();
 
-        // Stałe święta
-        holidays.add(LocalDate.of(year, 1, 1));   // Nowy Rok
-        holidays.add(LocalDate.of(year, 1, 6));   // Trzech Króli
-        holidays.add(LocalDate.of(year, 5, 1));   // Święto Pracy
-        holidays.add(LocalDate.of(year, 5, 3));   // Konstytucji 3 Maja
-        holidays.add(LocalDate.of(year, 8, 15));  // Wniebowzięcie NMP
-        holidays.add(LocalDate.of(year, 11, 1));  // Wszystkich Świętych
-        holidays.add(LocalDate.of(year, 11, 11)); // Niepodległości
-        holidays.add(LocalDate.of(year, 12, 25)); // Bożego Narodzenia 1
-        holidays.add(LocalDate.of(year, 12, 26)); // Bożego Narodzenia 2
+        holidays.add(LocalDate.of(year, 1, 1));
+        holidays.add(LocalDate.of(year, 1, 6));
+        holidays.add(LocalDate.of(year, 5, 1));
+        holidays.add(LocalDate.of(year, 5, 3));
+        holidays.add(LocalDate.of(year, 8, 15));
+        holidays.add(LocalDate.of(year, 11, 1));
+        holidays.add(LocalDate.of(year, 11, 11));
+        holidays.add(LocalDate.of(year, 12, 25));
+        holidays.add(LocalDate.of(year, 12, 26));
 
-        // --- NOWOŚĆ: Wigilia dniem wolnym od 2025 roku ---
         if (year >= 2025) {
             holidays.add(LocalDate.of(year, 12, 24));
         }
 
-        // Ruchome (Wielkanoc) - Algorytm Meeusa/Jonesa/Butchera
         int a = year % 19;
         int b = year / 100;
         int c = year % 100;
@@ -51,8 +48,8 @@ public class PolishHolidays {
 
         LocalDate easterSunday = LocalDate.of(year, month, day);
 
-        holidays.add(easterSunday.plusDays(1)); // Poniedziałek Wielkanocny
-        holidays.add(easterSunday.plusDays(60)); // Boże Ciało
+        holidays.add(easterSunday.plusDays(1));
+        holidays.add(easterSunday.plusDays(60));
 
         return holidays;
     }
@@ -65,7 +62,6 @@ public class PolishHolidays {
                 saturdays.add(date);
             }
         }
-        // Sortowanie, żeby na liście były po kolei
         saturdays.sort(LocalDate::compareTo);
         return saturdays;
     }

@@ -1,4 +1,11 @@
-package evidence;
+package evidence.view;
+
+import evidence.controller.EvidenceController;
+import evidence.model.AbsenceData;
+import evidence.model.DailySchedule;
+import evidence.model.EvidenceRequest;
+import evidence.model.SchedulePeriod;
+import evidence.util.PolishHolidays;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -8,7 +15,6 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.TextStyle;
-import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.List;
 import java.util.Locale;
@@ -17,10 +23,9 @@ import java.util.stream.IntStream;
 class GeneratorPanel extends JPanel {
 
     private final ViewNavigator navigator;
-    private final ExcelService excelService;
+    private final EvidenceController excelController;
     private static final String TEMPLATE_PATH = "Szablon_evidencja.xlsx";
 
-    // Pola UI
     private JTextField fieldImie, fieldRok;
     private JCheckBox checkDisabled;
     private JRadioButton radio20, radio26;
@@ -31,30 +36,31 @@ class GeneratorPanel extends JPanel {
     private JTextField fieldZaleglyUrlop;
     private JTextField fieldNadgodzinyStart;
 
-    // --- NOWE POLA DLA ŚCIEŻKI ZAPISU ---
     private JLabel labelOutputPath;
-    private File outputDirectory = new File("."); // Domyślnie obecny folder
+    private File outputDirectory = new File(".");
 
-    // Sekcja Harmonogramów
     private JPanel schedulesContainer;
     private List<SchedulePeriodPanel> schedulePanels = new ArrayList<>();
     private JButton btnAddSchedule;
 
-    // Sekcja nieobecności
     private JPanel absencesContainer;
     private List<AbsenceRowPanel> absenceRows = new ArrayList<>();
 
     private java.util.function.Supplier<Integer> yearSupplier = () -> {
-        try { return Integer.parseInt(fieldRok.getText()); } catch (Exception e) { return LocalDate.now().getYear(); }
+        try {
+            return Integer.parseInt(fieldRok.getText());
+        } catch (Exception e) {
+            return LocalDate.now().getYear();
+        }
     };
 
-    public GeneratorPanel(ViewNavigator navigator, ExcelService service) {
+    public GeneratorPanel(ViewNavigator navigator, EvidenceController service) {
         this.navigator = navigator;
-        this.excelService = service;
+        this.excelController = service;
 
         setLayout(new BorderLayout());
 
-        JButton btnBack = new JButton("<< Powrót do Menu");
+        JButton btnBack = new JButton("<< Powrot do Menu");
         btnBack.addActionListener(e -> navigator.showMenu());
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         topPanel.add(btnBack);
@@ -73,7 +79,6 @@ class GeneratorPanel extends JPanel {
         content.add(createAbsenceSection());
         content.add(Box.createVerticalStrut(10));
 
-        // --- DODANA SEKCJA WYBORU FOLDERU ---
         content.add(createOutputSection());
         content.add(Box.createVerticalStrut(20));
 
@@ -94,7 +99,6 @@ class GeneratorPanel extends JPanel {
         loadDefaultTemplate();
     }
 
-    // --- NOWA METODA: SEKCJA WYBORU FOLDERU ---
     private JPanel createOutputSection() {
         JPanel p = createTitledPanel("5. Miejsce zapisu dokumentu");
         p.setLayout(new BorderLayout(10, 5));
@@ -103,21 +107,18 @@ class GeneratorPanel extends JPanel {
         labelOutputPath.setForeground(Color.DARK_GRAY);
         p.add(labelOutputPath, BorderLayout.CENTER);
 
-        JButton btnChooseDir = new JButton("Zmień folder...");
+        JButton btnChooseDir = new JButton("Zmien folder...");
         btnChooseDir.addActionListener(e -> selectOutputDirectory());
         p.add(btnChooseDir, BorderLayout.EAST);
 
         return p;
     }
 
-    // --- LOGIKA WYBORU FOLDERU ---
     private void selectOutputDirectory() {
         JFileChooser chooser = new JFileChooser();
         chooser.setCurrentDirectory(outputDirectory);
-        chooser.setDialogTitle("Wybierz folder do zapisu (lub stwórz nowy)");
-        // Tryb wybierania tylko katalogów
+        chooser.setDialogTitle("Wybierz folder do zapisu");
         chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-        // Akceptuje "Wszystkie pliki" żeby widzieć foldery
         chooser.setAcceptAllFileFilterUsed(false);
 
         if (chooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
@@ -126,45 +127,40 @@ class GeneratorPanel extends JPanel {
         }
     }
 
-    // --- DANE PRACOWNIKA ---
     private JPanel createDataSection() {
         JPanel p = createTitledPanel("1. Dane Pracownika i Urlopy");
-        // Zwiększamy liczbę wierszy w GridLayout do 7, żeby wszystko się zmieściło
         p.setLayout(new GridLayout(7, 2, 5, 5));
 
-        // 1. PRZYWRÓCONA INICJALIZACJA labelPlik (To naprawia błąd NullPointerException)
         p.add(new JLabel("Status szablonu:"));
         labelPlik = new JLabel("...");
         p.add(labelPlik);
 
-        // 2. Imię i Nazwisko
-        p.add(new JLabel("Imię i Nazwisko:"));
+        p.add(new JLabel("Imie i Nazwisko:"));
         fieldImie = new JTextField("Jan Kowalski");
         p.add(fieldImie);
 
-        // 3. Rok
         p.add(new JLabel("Rok:"));
         fieldRok = new JTextField(String.valueOf(LocalDate.now().getYear()));
         p.add(fieldRok);
 
-        // 4. Zaległy urlop (Nowe pole)
-        p.add(new JLabel("Zaległy urlop (dni):"));
+        p.add(new JLabel("Zalegly urlop (dni):"));
         fieldZaleglyUrlop = new JTextField("0");
         p.add(fieldZaleglyUrlop);
 
-        // 5. Nadgodziny startowe (Nowe pole)
-        p.add(new JLabel("Nadgodziny z zeszłego roku (godz):"));
+        p.add(new JLabel("Nadgodziny z zeszlego roku (godz):"));
         fieldNadgodzinyStart = new JTextField("0");
         p.add(fieldNadgodzinyStart);
 
-        // 6. Wymiar urlopu (Radio buttons)
         JPanel pVacation = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
         radio20 = new JRadioButton("20 dni");
         radio26 = new JRadioButton("26 dni", true);
-        ButtonGroup bg = new ButtonGroup(); bg.add(radio20); bg.add(radio26);
-        pVacation.add(radio20); pVacation.add(radio26);
+        ButtonGroup bg = new ButtonGroup();
+        bg.add(radio20);
+        bg.add(radio26);
+        pVacation.add(radio20);
+        pVacation.add(radio26);
 
-        checkDisabled = new JCheckBox("Niepełnosprawny (+10 dni)");
+        checkDisabled = new JCheckBox("Niepelnosprawny (+10 dni)");
         labelTotalVacation = new JLabel(" (Razem: 26 dni)");
         labelTotalVacation.setForeground(Color.BLUE);
 
@@ -180,7 +176,8 @@ class GeneratorPanel extends JPanel {
         JPanel pOptions = new JPanel(new GridLayout(2, 1));
         pOptions.add(pVacation);
         JPanel pDis = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
-        pDis.add(checkDisabled); pDis.add(labelTotalVacation);
+        pDis.add(checkDisabled);
+        pDis.add(labelTotalVacation);
         pOptions.add(pDis);
 
         p.add(new JLabel("Wymiar urlopu:"));
@@ -189,7 +186,6 @@ class GeneratorPanel extends JPanel {
         return p;
     }
 
-    // --- HARMONOGRAMY ---
     private JPanel createSchedulesManagerSection() {
         JPanel p = createTitledPanel("2. Harmonogramy i Etaty");
         p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
@@ -226,7 +222,8 @@ class GeneratorPanel extends JPanel {
         schedulePanels.add(panel);
         schedulesContainer.add(panel);
         updateAddButtonState();
-        schedulesContainer.revalidate(); schedulesContainer.repaint();
+        schedulesContainer.revalidate();
+        schedulesContainer.repaint();
     }
 
     private void removeSchedulePanel(SchedulePeriodPanel p) {
@@ -234,9 +231,10 @@ class GeneratorPanel extends JPanel {
             schedulePanels.remove(p);
             schedulesContainer.remove(p);
             updateAddButtonState();
-            schedulesContainer.revalidate(); schedulesContainer.repaint();
+            schedulesContainer.revalidate();
+            schedulesContainer.repaint();
         } else {
-            JOptionPane.showMessageDialog(this, "Musi być co najmniej jeden harmonogram!");
+            JOptionPane.showMessageDialog(this, "Musi byc co najmniej jeden harmonogram!");
         }
     }
 
@@ -252,15 +250,14 @@ class GeneratorPanel extends JPanel {
         btnAddSchedule.setEnabled(!isEndOfYear);
     }
 
-    // --- NIEOBECNOŚCI ---
     private JPanel createAbsenceSection() {
-        JPanel p = createTitledPanel("4. Nieobecności");
+        JPanel p = createTitledPanel("4. Nieobecnosci");
         p.setLayout(new BorderLayout());
 
         absencesContainer = new JPanel();
         absencesContainer.setLayout(new BoxLayout(absencesContainer, BoxLayout.Y_AXIS));
 
-        JButton btnAddAbsence = new JButton("+ Dodaj nieobecność");
+        JButton btnAddAbsence = new JButton("+ Dodaj nieobecnosc");
         btnAddAbsence.addActionListener(e -> addAbsenceRow());
 
         p.add(absencesContainer, BorderLayout.CENTER);
@@ -284,21 +281,15 @@ class GeneratorPanel extends JPanel {
         absencesContainer.repaint();
     }
 
-    // --- KLASY WEWNĘTRZNE ---
     class SchedulePeriodPanel extends JPanel {
         JComboBox<String> sD, sM, eD, eM;
         JCheckBox checkEndOfYearLocal;
         JComboBox<String> comboEtat;
         Map<DayOfWeek, ScheduleRow> rows = new LinkedHashMap<>();
 
-        // NOWA, PEŁNA LISTA WG TWOICH ZDJĘĆ
         String[] ETATY = {
-                "1/1",
-                "1/2",
-                "1/3", "2/3",
-                "1/4", "2/4", "3/4",
-                "1/5", "2/5", "3/5", "4/5",
-                "1/8", "3/8", "5/8", "7/8",
+                "1/1", "1/2", "1/3", "2/3", "1/4", "2/4", "3/4",
+                "1/5", "2/5", "3/5", "4/5", "1/8", "3/8", "5/8", "7/8",
                 "1/10", "2/10", "3/10", "4/10", "5/10", "6/10", "7/10", "8/10", "9/10"
         };
 
@@ -313,54 +304,66 @@ class GeneratorPanel extends JPanel {
             this.stateChangedCallback = stateChangedCallback;
             setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
             setBorder(BorderFactory.createCompoundBorder(
-                    BorderFactory.createMatteBorder(0,0,1,0, Color.GRAY),
-                    BorderFactory.createEmptyBorder(5,5,5,5)));
+                    BorderFactory.createMatteBorder(0, 0, 1, 0, Color.GRAY),
+                    BorderFactory.createEmptyBorder(5, 5, 5, 5)));
 
             JPanel top = new JPanel(new FlowLayout(FlowLayout.LEFT));
 
-            // Sztywne wymiary (zachowujemy naprawę skalowania)
             Dimension dateDim = new Dimension(55, 25);
 
-            top.add(new JLabel("Obowiązuje OD:"));
-            sD = new JComboBox<>(getIntArray(1,31)); sD.setPreferredSize(dateDim);
-            sM = new JComboBox<>(getIntArray(1,12)); sM.setPreferredSize(dateDim);
+            top.add(new JLabel("Obowiazuje OD:"));
+            sD = new JComboBox<>(getIntArray(1, 31));
+            sD.setPreferredSize(dateDim);
+            sM = new JComboBox<>(getIntArray(1, 12));
+            sM.setPreferredSize(dateDim);
 
             sD.setSelectedItem(String.valueOf(defaultStart.getDayOfMonth()));
             sM.setSelectedItem(String.valueOf(defaultStart.getMonthValue()));
 
-            top.add(sD); top.add(new JLabel("/")); top.add(sM);
+            top.add(sD);
+            top.add(new JLabel("/"));
+            top.add(sM);
 
             top.add(new JLabel("  DO:"));
-            checkEndOfYearLocal = new JCheckBox("końca roku", true);
+            checkEndOfYearLocal = new JCheckBox("konca roku", true);
 
-            eD = new JComboBox<>(getIntArray(1,31)); eD.setPreferredSize(dateDim);
-            eM = new JComboBox<>(getIntArray(1,12)); eM.setPreferredSize(dateDim);
+            eD = new JComboBox<>(getIntArray(1, 31));
+            eD.setPreferredSize(dateDim);
+            eM = new JComboBox<>(getIntArray(1, 12));
+            eM.setPreferredSize(dateDim);
 
-            eD.setEnabled(false); eM.setEnabled(false); eD.setSelectedItem("31"); eM.setSelectedItem("12");
+            eD.setEnabled(false);
+            eM.setEnabled(false);
+            eD.setSelectedItem("31");
+            eM.setSelectedItem("12");
 
             java.awt.event.ActionListener dateChangeListener = e -> {
                 if (this.stateChangedCallback != null) this.stateChangedCallback.run();
             };
-            sD.addActionListener(dateChangeListener); sM.addActionListener(dateChangeListener);
-            eD.addActionListener(dateChangeListener); eM.addActionListener(dateChangeListener);
+            sD.addActionListener(dateChangeListener);
+            sM.addActionListener(dateChangeListener);
+            eD.addActionListener(dateChangeListener);
+            eM.addActionListener(dateChangeListener);
 
             checkEndOfYearLocal.addActionListener(e -> {
                 boolean active = !checkEndOfYearLocal.isSelected();
-                eD.setEnabled(active); eM.setEnabled(active);
+                eD.setEnabled(active);
+                eM.setEnabled(active);
                 if (this.stateChangedCallback != null) this.stateChangedCallback.run();
             });
             top.add(checkEndOfYearLocal);
-            top.add(eD); top.add(new JLabel("/")); top.add(eM);
+            top.add(eD);
+            top.add(new JLabel("/"));
+            top.add(eM);
 
             top.add(Box.createHorizontalStrut(15));
             top.add(new JLabel("Wymiar Etatu:"));
 
-            // Tuta podstawiamy nową listę ETATY
             comboEtat = new JComboBox<>(ETATY);
-            comboEtat.setPreferredSize(new Dimension(70, 25)); // Nieco szersze dla 10/10
+            comboEtat.setPreferredSize(new Dimension(70, 25));
             top.add(comboEtat);
 
-            JButton btnDel = new JButton("Usuń okres");
+            JButton btnDel = new JButton("Usun okres");
             btnDel.setForeground(Color.RED);
             btnDel.addActionListener(e -> removeAction.accept(this));
             top.add(btnDel);
@@ -381,20 +384,27 @@ class GeneratorPanel extends JPanel {
         public LocalDate getEndDate(int year) {
             if (checkEndOfYearLocal.isSelected()) return LocalDate.of(year, 12, 31);
             try {
-                return LocalDate.of(year, Integer.parseInt((String)eM.getSelectedItem()), Integer.parseInt((String)eD.getSelectedItem()));
-            } catch (Exception e) { return LocalDate.of(year, 12, 31); }
+                return LocalDate.of(year, Integer.parseInt((String) eM.getSelectedItem()), Integer.parseInt((String) eD.getSelectedItem()));
+            } catch (Exception e) {
+                return LocalDate.of(year, 12, 31);
+            }
         }
 
         public SchedulePeriod toModel(int year) {
             try {
-                LocalDate start = LocalDate.of(year, Integer.parseInt((String)sM.getSelectedItem()), Integer.parseInt((String)sD.getSelectedItem()));
+                LocalDate start = LocalDate.of(year, Integer.parseInt((String) sM.getSelectedItem()), Integer.parseInt((String) sD.getSelectedItem()));
                 LocalDate end = getEndDate(year);
                 Map<DayOfWeek, DailySchedule> weekly = new HashMap<>();
                 rows.forEach((d, r) -> weekly.put(d, r.toModel()));
-                return new SchedulePeriod(start, end, (String)comboEtat.getSelectedItem(), weekly);
-            } catch (Exception e) { return null; }
+                return new SchedulePeriod(start, end, (String) comboEtat.getSelectedItem(), weekly);
+            } catch (Exception e) {
+                return null;
+            }
         }
-        private String[] getIntArray(int start, int end) { return IntStream.rangeClosed(start, end).mapToObj(String::valueOf).toArray(String[]::new); }
+
+        private String[] getIntArray(int start, int end) {
+            return IntStream.rangeClosed(start, end).mapToObj(String::valueOf).toArray(String[]::new);
+        }
     }
 
     static class ScheduleRow extends JPanel {
@@ -405,23 +415,51 @@ class GeneratorPanel extends JPanel {
 
         public ScheduleRow(String label, String hs, String ms, String he, String me, boolean active) {
             setLayout(new FlowLayout(FlowLayout.LEFT));
-            checkActive = new JCheckBox(label, active); checkActive.setPreferredSize(new Dimension(110, 20)); add(checkActive);
-            hStart = new JComboBox<>(HOURS); hStart.setSelectedItem(hs);
-            mStart = new JComboBox<>(MINS); mStart.setSelectedItem(ms);
-            add(hStart); add(new JLabel(":")); add(mStart);
+            checkActive = new JCheckBox(label, active);
+            checkActive.setPreferredSize(new Dimension(110, 20));
+            add(checkActive);
+            hStart = new JComboBox<>(HOURS);
+            hStart.setSelectedItem(hs);
+            mStart = new JComboBox<>(MINS);
+            mStart.setSelectedItem(ms);
+            add(hStart);
+            add(new JLabel(":"));
+            add(mStart);
             add(new JLabel(" — "));
-            hEnd = new JComboBox<>(HOURS); hEnd.setSelectedItem(he);
-            mEnd = new JComboBox<>(MINS); mEnd.setSelectedItem(me);
-            add(hEnd); add(new JLabel(":")); add(mEnd);
-            checkActive.addActionListener(e -> toggle()); toggle();
+            hEnd = new JComboBox<>(HOURS);
+            hEnd.setSelectedItem(he);
+            mEnd = new JComboBox<>(MINS);
+            mEnd.setSelectedItem(me);
+            add(hEnd);
+            add(new JLabel(":"));
+            add(mEnd);
+            checkActive.addActionListener(e -> toggle());
+            toggle();
         }
-        private void toggle() { boolean on=checkActive.isSelected() && checkActive.isEnabled(); hStart.setEnabled(on); mStart.setEnabled(on); hEnd.setEnabled(on); mEnd.setEnabled(on); }
-        public void disableRow() { checkActive.setEnabled(false); checkActive.setSelected(false); toggle(); }
-        public void enableRow() { checkActive.setEnabled(true); toggle(); }
+
+        private void toggle() {
+            boolean on = checkActive.isSelected() && checkActive.isEnabled();
+            hStart.setEnabled(on);
+            mStart.setEnabled(on);
+            hEnd.setEnabled(on);
+            mEnd.setEnabled(on);
+        }
+
+        public void disableRow() {
+            checkActive.setEnabled(false);
+            checkActive.setSelected(false);
+            toggle();
+        }
+
+        public void enableRow() {
+            checkActive.setEnabled(true);
+            toggle();
+        }
+
         public DailySchedule toModel() {
             return new DailySchedule(checkActive.isSelected(),
-                    LocalTime.of(Integer.parseInt((String)hStart.getSelectedItem()), Integer.parseInt((String)mStart.getSelectedItem())),
-                    LocalTime.of(Integer.parseInt((String)hEnd.getSelectedItem()), Integer.parseInt((String)mEnd.getSelectedItem())));
+                    LocalTime.of(Integer.parseInt((String) hStart.getSelectedItem()), Integer.parseInt((String) mStart.getSelectedItem())),
+                    LocalTime.of(Integer.parseInt((String) hEnd.getSelectedItem()), Integer.parseInt((String) mEnd.getSelectedItem())));
         }
     }
 
@@ -441,35 +479,53 @@ class GeneratorPanel extends JPanel {
             typeCombo = new JComboBox<>(new String[]{"UW", "UM", "UO", "UB", "CH", "OP", "NU", "DEL", "NN"});
             add(typeCombo);
             checkOvertimePickup = new JCheckBox("Z nadgodzin");
-            checkOvertimePickup.setToolTipText("Zaznacz, jeśli to odbiór nadgodzin (nie pomniejsza urlopu)");
+            checkOvertimePickup.setToolTipText("Zaznacz, jesli to odbior nadgodzin");
             add(checkOvertimePickup);
             add(Box.createHorizontalStrut(10));
-            add(new JLabel("Od:")); add(new JLabel("Dz:")); sD = new JComboBox<>(); add(sD);
-            add(new JLabel("Msc:")); sM = new JComboBox<>(getIntArray(1,12)); sM.setSelectedItem(String.valueOf(LocalDate.now().getMonthValue())); add(sM);
+            add(new JLabel("Od:"));
+            add(new JLabel("Dz:"));
+            sD = new JComboBox<>();
+            add(sD);
+            add(new JLabel("Msc:"));
+            sM = new JComboBox<>(getIntArray(1, 12));
+            sM.setSelectedItem(String.valueOf(LocalDate.now().getMonthValue()));
+            add(sM);
 
             panelEnd = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
-            panelEnd.add(new JLabel(" Do:")); panelEnd.add(new JLabel("Dz:")); eD = new JComboBox<>(); panelEnd.add(eD);
-            panelEnd.add(new JLabel("Msc:")); eM = new JComboBox<>(getIntArray(1,12)); eM.setSelectedItem(String.valueOf(LocalDate.now().getMonthValue())); panelEnd.add(eM);
+            panelEnd.add(new JLabel(" Do:"));
+            panelEnd.add(new JLabel("Dz:"));
+            eD = new JComboBox<>();
+            panelEnd.add(eD);
+            panelEnd.add(new JLabel("Msc:"));
+            eM = new JComboBox<>(getIntArray(1, 12));
+            eM.setSelectedItem(String.valueOf(LocalDate.now().getMonthValue()));
+            panelEnd.add(eM);
             add(panelEnd);
 
-            updateDays(sM, sD); updateDays(eM, eD);
-            sM.addActionListener(e -> updateDays(sM, sD)); eM.addActionListener(e -> updateDays(eM, eD));
+            updateDays(sM, sD);
+            updateDays(eM, eD);
+            sM.addActionListener(e -> updateDays(sM, sD));
+            eM.addActionListener(e -> updateDays(eM, eD));
 
             panelOdbior = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
-            panelOdbior.add(new JLabel("  Odbiór za (święto w sob.):"));
-            odbiorD = new JComboBox<>(); odbiorD.setPreferredSize(new Dimension(130, 22));
+            panelOdbior.add(new JLabel("  Odbior za (swieto w sob.):"));
+            odbiorD = new JComboBox<>();
+            odbiorD.setPreferredSize(new Dimension(130, 22));
             panelOdbior.add(odbiorD);
             panelOdbior.setVisible(false);
             add(panelOdbior);
 
             typeCombo.addActionListener(e -> {
                 boolean isUO = "UO".equals(typeCombo.getSelectedItem());
-                panelEnd.setVisible(!isUO); panelOdbior.setVisible(isUO);
+                panelEnd.setVisible(!isUO);
+                panelOdbior.setVisible(isUO);
                 if (isUO) loadHolidaySaturdays();
-                revalidate(); repaint();
+                revalidate();
+                repaint();
             });
 
-            btnRemove = new JButton("X"); btnRemove.setForeground(Color.RED);
+            btnRemove = new JButton("X");
+            btnRemove.setForeground(Color.RED);
             btnRemove.addActionListener(e -> rem.accept(this));
             add(btnRemove);
             setPreferredSize(new Dimension(920, 40));
@@ -483,45 +539,61 @@ class GeneratorPanel extends JPanel {
             List<LocalDate> allSaturdays = new ArrayList<>(satsPrev);
             allSaturdays.addAll(satsCurrent);
             odbiorD.removeAllItems();
-            if (allSaturdays.isEmpty()) { odbiorD.addItem("Brak świąt"); odbiorD.setEnabled(false); }
-            else { odbiorD.setEnabled(true); for (LocalDate d : allSaturdays) odbiorD.addItem(d.getDayOfMonth() + "." + d.getMonthValue() + "." + d.getYear()); }
+            if (allSaturdays.isEmpty()) {
+                odbiorD.addItem("Brak swiat");
+                odbiorD.setEnabled(false);
+            } else {
+                odbiorD.setEnabled(true);
+                for (LocalDate d : allSaturdays) odbiorD.addItem(d.getDayOfMonth() + "." + d.getMonthValue() + "." + d.getYear());
+            }
         }
 
         private void updateDays(JComboBox<String> mC, JComboBox<String> dC) {
             int year = yearP.get();
             int month = Integer.parseInt((String) mC.getSelectedItem());
-            int max = 31; try { max = LocalDate.of(year, month, 1).lengthOfMonth(); } catch(Exception e){}
+            int max = 31;
+            try {
+                max = LocalDate.of(year, month, 1).lengthOfMonth();
+            } catch (Exception e) {
+            }
             dC.removeAllItems();
-            for(int i=1; i<=max; i++) {
+            for (int i = 1; i <= max; i++) {
                 try {
                     LocalDate d = LocalDate.of(year, month, i);
-                    if (!PolishHolidays.isHoliday(d) && d.getDayOfWeek() != DayOfWeek.SATURDAY && d.getDayOfWeek() != DayOfWeek.SUNDAY) { dC.addItem(String.valueOf(i)); }
-                } catch (Exception e) {}
+                    if (!PolishHolidays.isHoliday(d) && d.getDayOfWeek() != DayOfWeek.SATURDAY && d.getDayOfWeek() != DayOfWeek.SUNDAY) {
+                        dC.addItem(String.valueOf(i));
+                    }
+                } catch (Exception e) {
+                }
             }
         }
-        private String[] getIntArray(int start, int end) { return IntStream.rangeClosed(start, end).mapToObj(String::valueOf).toArray(String[]::new); }
+
+        private String[] getIntArray(int start, int end) {
+            return IntStream.rangeClosed(start, end).mapToObj(String::valueOf).toArray(String[]::new);
+        }
 
         public List<AbsenceData> toModelList(int year) {
             List<AbsenceData> list = new ArrayList<>();
             try {
                 String type = (String) typeCombo.getSelectedItem();
-                LocalDate start = LocalDate.of(year, Integer.parseInt((String)sM.getSelectedItem()), Integer.parseInt((String)sD.getSelectedItem()));
-                LocalDate end = "UO".equals(type) ? start : LocalDate.of(year, Integer.parseInt((String)eM.getSelectedItem()), Integer.parseInt((String)eD.getSelectedItem()));
+                LocalDate start = LocalDate.of(year, Integer.parseInt((String) sM.getSelectedItem()), Integer.parseInt((String) sD.getSelectedItem()));
+                LocalDate end = "UO".equals(type) ? start : LocalDate.of(year, Integer.parseInt((String) eM.getSelectedItem()), Integer.parseInt((String) eD.getSelectedItem()));
                 String note = "";
-                if ("UO".equals(type) && odbiorD.getSelectedItem() != null) note = "odbiór za " + odbiorD.getSelectedItem().toString();
+                if ("UO".equals(type) && odbiorD.getSelectedItem() != null) note = "odbiur za " + odbiorD.getSelectedItem().toString();
                 if (!end.isBefore(start)) {
                     LocalDate curr = start;
                     while (!curr.isAfter(end)) {
                         if (!PolishHolidays.isHoliday(curr) && curr.getDayOfWeek() != DayOfWeek.SATURDAY && curr.getDayOfWeek() != DayOfWeek.SUNDAY) {
                             AbsenceData data = new AbsenceData(type, curr, note);
-                            // USTAWIAMY FLAGĘ
                             if (checkOvertimePickup.isSelected()) data.setOvertimePickup(true);
                             list.add(data);
                         }
                         curr = curr.plusDays(1);
                     }
                 }
-            } catch (Exception e) { return null; }
+            } catch (Exception e) {
+                return null;
+            }
             return list;
         }
     }
@@ -533,34 +605,22 @@ class GeneratorPanel extends JPanel {
             LocalDate start = LocalDate.of(year, 1, 1);
             LocalDate end = LocalDate.of(year, 12, 31);
 
-            int zalegly = 0; try { zalegly = Integer.parseInt(fieldZaleglyUrlop.getText()); } catch(Exception e){}
-            int nadgodziny = 0; try { nadgodziny = Integer.parseInt(fieldNadgodzinyStart.getText()); } catch(Exception e){}
+            int zalegly = 0;
+            try {
+                zalegly = Integer.parseInt(fieldZaleglyUrlop.getText());
+            } catch (Exception e) {
+            }
+            int nadgodziny = 0;
+            try {
+                nadgodziny = Integer.parseInt(fieldNadgodzinyStart.getText());
+            } catch (Exception e) {
+            }
 
-            // 1. Pobieramy harmonogramy z UI
             List<SchedulePeriod> schedules = new ArrayList<>();
             for (SchedulePeriodPanel p : schedulePanels) {
                 SchedulePeriod sp = p.toModel(year);
                 if (sp != null) schedules.add(sp);
             }
-
-            // --- NOWOŚĆ: WALIDACJA CZASU PRACY ---
-            TimeValidator.ValidationResult validation = TimeValidator.validate(schedules);
-
-            if (validation.hasOvertime()) {
-                String message = "WYKRYTO NIEZGODNOŚĆ Z ETATEM!\n\n" +
-                        "Zaplanowany grafik przekracza wymiar etatu (37h 55min).\n" +
-                        "System wygeneruje plik, ale godziny będą się różnić od umowy.\n\n" +
-                        "RAPORT NADGODZIN:\n" +
-                        validation.getReport() +
-                        "\n\nCzy chcesz kontynuować mimo to?";
-
-                int choice = JOptionPane.showConfirmDialog(this, message, "Ostrzeżenie o nadgodzinach", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
-
-                if (choice == JOptionPane.NO_OPTION) {
-                    return; // Przerwij generowanie, pozwól użytkownikowi poprawić
-                }
-            }
-            // -------------------------------------
 
             List<AbsenceData> abs = new ArrayList<>();
             for (AbsenceRowPanel p : absenceRows) {
@@ -573,21 +633,35 @@ class GeneratorPanel extends JPanel {
 
             new Thread(() -> {
                 try {
-                    excelService.generateEvidence(req);
+                    excelController.generateEvidence(req);
                     SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(this, "Gotowe! Plik zapisano w: " + outputDirectory.getAbsolutePath()));
-                } catch(Exception e) {
+                } catch (Exception e) {
                     e.printStackTrace();
-                    SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(this, "Błąd: " + e.getMessage()));
+                    SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(this, "Blad: " + e.getMessage()));
                 }
             }).start();
-        } catch (Exception e) { JOptionPane.showMessageDialog(this, "Błąd danych: " + e.getMessage()); }
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Blad danych: " + e.getMessage());
+        }
     }
 
     private void loadDefaultTemplate() {
         File f = new File(TEMPLATE_PATH);
-        if (f.exists()) { selectedFile = f; labelPlik.setText(f.getName()); labelPlik.setForeground(new Color(0,100,0)); btnGeneruj.setEnabled(true); }
-        else { labelPlik.setText("BRAK PLIKU SZABLONU!"); labelPlik.setForeground(Color.RED); btnGeneruj.setEnabled(false); }
+        if (f.exists()) {
+            selectedFile = f;
+            labelPlik.setText(f.getName());
+            labelPlik.setForeground(new Color(0, 100, 0));
+            btnGeneruj.setEnabled(true);
+        } else {
+            labelPlik.setText("BRAK PLIKU SZABLONU!");
+            labelPlik.setForeground(Color.RED);
+            btnGeneruj.setEnabled(false);
+        }
     }
-    private JPanel createTitledPanel(String t) { JPanel p=new JPanel(); p.setBorder(BorderFactory.createTitledBorder(t)); return p; }
-}
 
+    private JPanel createTitledPanel(String t) {
+        JPanel p = new JPanel();
+        p.setBorder(BorderFactory.createTitledBorder(t));
+        return p;
+    }
+}

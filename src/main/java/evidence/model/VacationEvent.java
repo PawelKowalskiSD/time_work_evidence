@@ -1,10 +1,10 @@
-package evidence;
+package evidence.model;
 
 import java.time.LocalDate;
 
 public class VacationEvent {
     private LocalDate date;
-    private int newDimension; // Np. 20, 26, 30, 36 (podstawa + dodatki)
+    private int newDimension;
     private String description;
 
     public VacationEvent(LocalDate date, int newDimension, String description) {

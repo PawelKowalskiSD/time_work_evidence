@@ -1,4 +1,8 @@
-package evidence;
+package evidence.view;
+
+import evidence.controller.EditorService;
+import evidence.controller.VacationReportGenerator;
+import evidence.model.VacationEvent;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -6,7 +10,6 @@ import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.io.File;
 import java.time.LocalDate;
-import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -21,7 +24,6 @@ public class EditorPanel extends JPanel {
     private JProgressBar progressBar;
     private JLabel lblStatus;
 
-    // Pola konfiguracji
     private JTextField fieldStartOverdueDays;
     private JTextField fieldBaseYearlyDays;
     private DefaultTableModel eventsTableModel;
@@ -32,17 +34,14 @@ public class EditorPanel extends JPanel {
         setLayout(new BorderLayout());
         setBorder(new EmptyBorder(10, 10, 10, 10));
 
-        // --- GÓRA ---
         JPanel top = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        JButton btnBack = new JButton("<< Powrót");
+        JButton btnBack = new JButton("<< Wroc");
         btnBack.addActionListener(e -> navigator.showMenu());
         top.add(btnBack);
         add(top, BorderLayout.NORTH);
 
-        // --- ŚRODEK (Lewo: Pliki, Prawo: Konfiguracja) ---
         JPanel center = new JPanel(new GridLayout(1, 2, 10, 0));
 
-        // Lewo
         JPanel leftPanel = new JPanel(new BorderLayout());
         leftPanel.setBorder(BorderFactory.createTitledBorder("1. Pliki Excel (Lata)"));
         listModel = new DefaultListModel<>();
@@ -53,12 +52,11 @@ public class EditorPanel extends JPanel {
         btnSelect.addActionListener(e -> selectFiles());
         leftPanel.add(btnSelect, BorderLayout.SOUTH);
 
-        // Prawo
         JPanel rightPanel = new JPanel(new BorderLayout());
         rightPanel.setBorder(BorderFactory.createTitledBorder("2. Zdarzenia (Zmiana wymiaru)"));
 
         JPanel startConfig = new JPanel(new GridLayout(2, 2, 5, 5));
-        startConfig.add(new JLabel("Zaległy na start (dni):"));
+        startConfig.add(new JLabel("Zalegly na start (dni):"));
         fieldStartOverdueDays = new JTextField("0");
         startConfig.add(fieldStartOverdueDays);
 
@@ -68,16 +66,15 @@ public class EditorPanel extends JPanel {
 
         rightPanel.add(startConfig, BorderLayout.NORTH);
 
-        // Tabela Zdarzeń
         String[] columns = {"Data (RRRR-MM-DD)", "Nowy Wymiar", "Opis"};
         eventsTableModel = new DefaultTableModel(columns, 0);
         eventsTable = new JTable(eventsTableModel);
         rightPanel.add(new JScrollPane(eventsTable), BorderLayout.CENTER);
 
         JPanel eventsButtons = new JPanel(new FlowLayout());
-        JButton btnAddEvent = new JButton("Dodaj Zmianę");
+        JButton btnAddEvent = new JButton("Dodaj Zmiane");
         btnAddEvent.addActionListener(e -> addEventDialog());
-        JButton btnDelEvent = new JButton("Usuń");
+        JButton btnDelEvent = new JButton("Usun");
         btnDelEvent.addActionListener(e -> {
             int row = eventsTable.getSelectedRow();
             if (row != -1) eventsTableModel.removeRow(row);
@@ -90,11 +87,9 @@ public class EditorPanel extends JPanel {
         center.add(rightPanel);
         add(center, BorderLayout.CENTER);
 
-        // --- DÓŁ (PRZYCISKI AKCJI) ---
         JPanel bottom = new JPanel(new BorderLayout(5, 5));
         JPanel actionButtons = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 10));
 
-        // PRZYCISK 1: AKTUALIZACJA PLIKÓW (KOLORY, NORMY, P42)
         JButton btnUpdate = new JButton("KROK 1: PRZELICZ PLIKI EXCEL");
         btnUpdate.setFont(new Font("Segoe UI", Font.BOLD, 12));
         btnUpdate.setBackground(new Color(70, 130, 180));
@@ -102,8 +97,7 @@ public class EditorPanel extends JPanel {
         btnUpdate.setPreferredSize(new Dimension(220, 40));
         btnUpdate.addActionListener(e -> runUpdate());
 
-        // PRZYCISK 2: GENEROWANIE RAPORTU (PRZYWRÓCONY!)
-        JButton btnReport = new JButton("KROK 2: GENERUJ KARTĘ ROCZNĄ");
+        JButton btnReport = new JButton("KROK 2: GENERUJ KARTA ROCZNA");
         btnReport.setFont(new Font("Segoe UI", Font.BOLD, 12));
         btnReport.setBackground(new Color(0, 100, 0));
         btnReport.setForeground(Color.WHITE);
@@ -128,7 +122,7 @@ public class EditorPanel extends JPanel {
         JTextField wField = new JTextField("36");
         JTextField oField = new JTextField("Orzeczenie");
 
-        Object[] msg = { "Data:", dField, "Nowy Wymiar:", wField, "Opis:", oField };
+        Object[] msg = {"Data:", dField, "Nowy Wymiar:", wField, "Opis:", oField};
         if (JOptionPane.showConfirmDialog(this, msg, "Dodaj", JOptionPane.OK_CANCEL_OPTION) == 0) {
             eventsTableModel.addRow(new Object[]{dField.getText(), wField.getText(), oField.getText()});
         }
@@ -155,13 +149,14 @@ public class EditorPanel extends JPanel {
                 int dim = Integer.parseInt((String) eventsTableModel.getValueAt(i, 1));
                 String desc = (String) eventsTableModel.getValueAt(i, 2);
                 events.add(new VacationEvent(LocalDate.parse(d), dim, desc));
-            } catch (Exception e) {}
+            } catch (Exception e) {
+            }
         }
         return events;
     }
 
     private void runUpdate() {
-        if(selectedFiles.isEmpty()) return;
+        if (selectedFiles.isEmpty()) return;
         new Thread(() -> {
             try {
                 int overdue = Integer.parseInt(fieldStartOverdueDays.getText());
@@ -169,16 +164,20 @@ public class EditorPanel extends JPanel {
                 List<VacationEvent> events = getEventsFromTable();
 
                 editorService.processFilesChain(selectedFiles, overdue, base, events, (s, c, t) -> {
-                    SwingUtilities.invokeLater(() -> { lblStatus.setText(s); progressBar.setMaximum(t); progressBar.setValue(c); });
+                    SwingUtilities.invokeLater(() -> {
+                        lblStatus.setText(s);
+                        progressBar.setMaximum(t);
+                        progressBar.setValue(c);
+                    });
                 });
             } catch (Exception e) {
-                SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(this, "Błąd danych!"));
+                SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(this, "Blad danych!"));
             }
         }).start();
     }
 
     private void runReportGeneration() {
-        if(selectedFiles.isEmpty()) return;
+        if (selectedFiles.isEmpty()) return;
         JFileChooser chooser = new JFileChooser();
         chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
         if (chooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
@@ -186,13 +185,18 @@ public class EditorPanel extends JPanel {
             new Thread(() -> {
                 try {
                     int base = Integer.parseInt(fieldBaseYearlyDays.getText());
-                    // Przekazujemy również eventy do raportu, żeby dobrze policzył limity!
                     List<VacationEvent> events = getEventsFromTable();
 
                     reportGenerator.generateReport(selectedFiles, outDir, base, events, (s, c, t) -> {
-                        SwingUtilities.invokeLater(() -> { lblStatus.setText(s); progressBar.setMaximum(t); progressBar.setValue(c); });
+                        SwingUtilities.invokeLater(() -> {
+                            lblStatus.setText(s);
+                            progressBar.setMaximum(t);
+                            progressBar.setValue(c);
+                        });
                     });
-                } catch (Exception e) { e.printStackTrace(); }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
             }).start();
         }
     }

@@ -1,26 +1,25 @@
-package evidence;
+package evidence.util;
+
+import evidence.model.DailySchedule;
+import evidence.model.SchedulePeriod;
 
 import java.time.Duration;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 public class TimeValidator {
-    // Pełny etat = 37h 55min = 2275 minut
     private static final double BASE_FULL_TIME_MINUTES = (37 * 60) + 55;
 
     public static ValidationResult validate(List<SchedulePeriod> periods) {
         ValidationResult result = new ValidationResult();
 
         for (SchedulePeriod period : periods) {
-            // 1. Oblicz ile minut powinien pracować w tygodniu (wg etatu)
-            double requiredMinutes = calculateRequiredMinutes(period.etat);
+            double requiredMinutes = calculateRequiredMinutes(period.getEtat());
 
-            // 2. Oblicz ile minut faktycznie zaplanowano w harmonogramie
-            long scheduledMinutes = calculateScheduledMinutes(period.weeklySchedule);
+            long scheduledMinutes = calculateScheduledMinutes(period.getWeeklySchedule());
 
-            // 3. Porównaj (z małym marginesem błędu dla ułamków)
-            // Jeśli zaplanowano więcej niż etat przewiduje (np. o więcej niż 1 minutę)
             if (scheduledMinutes > requiredMinutes + 1.0) {
                 long overtimeMinutes = (long) (scheduledMinutes - requiredMinutes);
                 result.addError(period, requiredMinutes, scheduledMinutes, overtimeMinutes);
@@ -36,7 +35,7 @@ public class TimeValidator {
             double denominator = Double.parseDouble(parts[1]);
             return BASE_FULL_TIME_MINUTES * (numerator / denominator);
         } catch (Exception e) {
-            return BASE_FULL_TIME_MINUTES; // Domyślnie pełny etat w razie błędu
+            return BASE_FULL_TIME_MINUTES;
         }
     }
 
@@ -50,7 +49,6 @@ public class TimeValidator {
         return totalMinutes;
     }
 
-    // Klasa pomocnicza do przechowywania wyników
     public static class ValidationResult {
         private final List<String> messages = new ArrayList<>();
         private boolean hasOvertime = false;
@@ -62,7 +60,7 @@ public class TimeValidator {
                             "   - Norma: %s\n" +
                             "   - Grafik: %s\n" +
                             "   - NADGODZINY TYGODNIOWE: %s",
-                    period.start, period.end, period.etat,
+                    period.getStart(), period.getEnd(), period.getEtat(),
                     formatMinutes(required),
                     formatMinutes(scheduled),
                     formatMinutes(overtime)

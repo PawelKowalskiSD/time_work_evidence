@@ -1,5 +1,6 @@
-package evidence;
+package evidence.controller;
 
+import evidence.model.VacationEvent;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.apache.poi.ss.util.CellRangeAddress;
@@ -17,7 +18,6 @@ import java.util.regex.Pattern;
 
 public class EditorService {
     private static final double POOL_CONVERSION_FACTOR = 7.0 + (35.0 / 60.0);
-    private static final double POOL_CONVERSION_FACTOR_INVALID = 7.0;
 
     public interface ProgressListener {
         void update(String status, int current, int total);
@@ -42,7 +42,7 @@ public class EditorService {
             }
             count++;
         }
-        listener.update("Zakończono.", count, count);
+        listener.update("Zakonczono.", count, count);
     }
 
     private double[] updateSingleFile(File file, int year, double startOverdueHours, double startOvertimeBalance, int baseDimStartOfYear, List<VacationEvent> events) throws IOException {
@@ -50,12 +50,10 @@ public class EditorService {
              Workbook workbook = new XSSFWorkbook(fis)) {
 
             List<MonthStatus> yearMap = buildYearMap(workbook, year, baseDimStartOfYear, events);
-
-            // Tutaj była brakująca metoda - teraz jest zdefiniowana na dole klasy
             String poolDesc = generateDescription(yearMap);
 
             int detectedStartMonth = detectStartMonth(workbook);
-            double currentCurrent = calculateComplexPool(yearMap); // Oblicza 144:05
+            double currentCurrent = calculateComplexPool(yearMap);
 
             double currentOverdue = startOverdueHours;
             double runningOvertimeBalance = startOvertimeBalance;
@@ -90,11 +88,10 @@ public class EditorService {
             try (FileOutputStream fos = new FileOutputStream(file)) {
                 workbook.write(fos);
             }
-            return new double[] { currentOverdue + currentCurrent, runningOvertimeBalance };
+            return new double[]{currentOverdue + currentCurrent, runningOvertimeBalance};
         }
     }
 
-    // --- BRAKUJĄCA METODA (teraz dodana) ---
     private String generateDescription(List<MonthStatus> map) {
         StringBuilder sb = new StringBuilder();
         double lastFte = -1;
@@ -111,20 +108,22 @@ public class EditorService {
     }
 
     private void drawRequestedTables(Sheet sheet, int startRow, double[] normParts, double initOverdue, double yearPool, double initOvertime, String note, boolean isFirstMonth, String prevSheet) {
-        // TU BYŁ BŁĄD - brakowało definicji wb
         Workbook wb = sheet.getWorkbook();
 
-        // STYLE
         CellStyle baseBorder = wb.createCellStyle();
-        baseBorder.setBorderBottom(BorderStyle.THIN); baseBorder.setBorderTop(BorderStyle.THIN);
-        baseBorder.setBorderLeft(BorderStyle.THIN); baseBorder.setBorderRight(BorderStyle.THIN);
+        baseBorder.setBorderBottom(BorderStyle.THIN);
+        baseBorder.setBorderTop(BorderStyle.THIN);
+        baseBorder.setBorderLeft(BorderStyle.THIN);
+        baseBorder.setBorderRight(BorderStyle.THIN);
         baseBorder.setVerticalAlignment(VerticalAlignment.CENTER);
 
         CellStyle greyBold11 = wb.createCellStyle();
         greyBold11.cloneStyleFrom(baseBorder);
         greyBold11.setFillForegroundColor(IndexedColors.GREY_25_PERCENT.getIndex());
         greyBold11.setFillPattern(FillPatternType.SOLID_FOREGROUND);
-        Font font11 = wb.createFont(); font11.setBold(true); font11.setFontHeightInPoints((short)11);
+        Font font11 = wb.createFont();
+        font11.setBold(true);
+        font11.setFontHeightInPoints((short) 11);
         greyBold11.setFont(font11);
 
         CellStyle greyCenter11 = wb.createCellStyle();
@@ -144,30 +143,29 @@ public class EditorService {
         noteStyle.cloneStyleFrom(baseBorder);
         noteStyle.setAlignment(HorizontalAlignment.CENTER);
         noteStyle.setWrapText(true);
-        Font sFont = wb.createFont(); sFont.setFontHeightInPoints((short)8); noteStyle.setFont(sFont);
+        Font sFont = wb.createFont();
+        sFont.setFontHeightInPoints((short) 8);
+        noteStyle.setFont(sFont);
 
-        // Wysokość 17 pikseli
         float h17px = 12.75f;
         getOrCreateRow(sheet, startRow + 3).setHeightInPoints(h17px);
         getOrCreateRow(sheet, startRow + 4).setHeightInPoints(h17px);
 
-        // --- ROW 42 ---
         Row r42 = getOrCreateRow(sheet, startRow);
         createCell(r42, 0, "*)", null);
-        createMergedCell(sheet, r42, 1, 8, "należy wypełnić po zakńczeniu danego okresu rozliczeniowego", greyBold11);
+        createMergedCell(sheet, r42, 1, 8, "naleza wypelnic po zakonczeniu danego okresu rozliczeniowego", greyBold11);
         createMergedCell(sheet, r42, 9, 10, "GODZINY", greyCenter11);
         createMergedCell(sheet, r42, 12, 14, "KAT.", greyCenter11);
-        createMergedCell(sheet, r42, 15, 17, "BILANS POCZĄTKOWY", greyCenter11);
+        createMergedCell(sheet, r42, 15, 17, "BILANS POCZATKOWY", greyCenter11);
         createMergedCell(sheet, r42, 18, 20, "WYKAZ", greyCenter11);
-        createMergedCell(sheet, r42, 21, 23, "SALDO NA KONIEC MIESIĄCA", greyCenter11);
+        createMergedCell(sheet, r42, 21, 23, "SALDO NA KONIEC MIESIACA", greyCenter11);
 
-        // --- ROW 43 ---
         Row r43 = getOrCreateRow(sheet, startRow + 1);
         createMergedCell(sheet, r43, 1, 6, "Normatywny czas pracy za okres rozliczeniowy", greyBold11);
         createValueCell(r43, 7, normParts[0], dataStyle);
         createValueCell(r43, 8, normParts[1], dataStyle);
         createFormulaMergedCell(sheet, r43, 9, 10, "SUM(H43:I43)", dataStyle);
-        createMergedCell(sheet, r43, 12, 14, "URLOP ZALEGŁY", greyCenter11);
+        createMergedCell(sheet, r43, 12, 14, "URLOP ZALEGLY", greyCenter11);
 
         if (isFirstMonth) createValueMergedCell(sheet, r43, 15, 17, initOverdue, dataStyle);
         else createFormulaMergedCell(sheet, r43, 15, 17, "'" + prevSheet + "'!V43", dataStyle);
@@ -175,11 +173,10 @@ public class EditorService {
         createFormulaMergedCell(sheet, r43, 18, 20, "MIN(P43,SUM(L9:L39))", dataStyle);
         createFormulaMergedCell(sheet, r43, 21, 23, "P43-S43", dataStyle);
 
-        // --- ROW 44 ---
         Row r44 = getOrCreateRow(sheet, startRow + 2);
         createMergedCell(sheet, r44, 1, 8, "Faktyczny czas pracy pracownika", greyBold11);
         createFormulaMergedCell(sheet, r44, 9, 10, "F40", dataStyle);
-        createMergedCell(sheet, r44, 12, 14, "URLOP BIEŻĄCY", greyCenter11);
+        createMergedCell(sheet, r44, 12, 14, "URLOP BIEZACY", greyCenter11);
 
         if (isFirstMonth) createValueMergedCell(sheet, r44, 15, 17, yearPool, dataStyle);
         else createFormulaMergedCell(sheet, r44, 15, 17, "'" + prevSheet + "'!V44", dataStyle);
@@ -187,7 +184,6 @@ public class EditorService {
         createFormulaMergedCell(sheet, r44, 18, 20, "MAX(0,SUM(L9:L39)-S43)", dataStyle);
         createFormulaMergedCell(sheet, r44, 21, 23, "P44-S44", dataStyle);
 
-        // --- ROW 45 ---
         Row r45 = getOrCreateRow(sheet, startRow + 3);
         createMergedCell(sheet, r45, 1, 8, "Czas zaliczany do czasu pracy pracownika (urlopy, del. itp..)", greyBold11);
         createFormulaMergedCell(sheet, r45, 9, 10, "SUM(L40:T40)", dataStyle);
@@ -199,10 +195,11 @@ public class EditorService {
         createFormulaMergedCell(sheet, r45, 18, 20, "J46-J43", dataStyle);
         createFormulaMergedCell(sheet, r45, 21, 23, "P45+S45", dataStyle);
 
-        // --- ROW 46 ---
         Row r46 = getOrCreateRow(sheet, startRow + 4);
         createCell(r46, 0, "*)", null);
-        CellStyle rightBold = wb.createCellStyle(); rightBold.cloneStyleFrom(greyBold11); rightBold.setAlignment(HorizontalAlignment.RIGHT);
+        CellStyle rightBold = wb.createCellStyle();
+        rightBold.cloneStyleFrom(greyBold11);
+        rightBold.setAlignment(HorizontalAlignment.RIGHT);
         createMergedCell(sheet, r46, 1, 8, "RAZEM", rightBold);
         createFormulaMergedCell(sheet, r46, 9, 10, "J44+J45", dataStyle);
         createMergedCell(sheet, r46, 12, 14, "NOTATKA", greyCenter11);
@@ -239,14 +236,65 @@ public class EditorService {
         return Math.ceil(totalDays) * POOL_CONVERSION_FACTOR;
     }
 
-    // --- HELPERY ---
-    private void createCell(Row r, int c, String v, CellStyle s) { Cell cell = r.getCell(c); if (cell == null) cell = r.createCell(c); cell.setCellValue(v); if (s != null) cell.setCellStyle(s); }
-    private void createValueCell(Row r, int c, double v, CellStyle s) { Cell cell = r.getCell(c); if (cell == null) cell = r.createCell(c); cell.setCellValue(v / 24.0); cell.setCellStyle(s); }
-    private void createFormulaCell(Row r, int c, String f, CellStyle s) { Cell cell = r.getCell(c); if (cell == null) cell = r.createCell(c); cell.setCellFormula(f); cell.setCellStyle(s); }
-    private void createMergedCell(Sheet s, Row r, int c1, int c2, String v, CellStyle st) { Cell cell = r.createCell(c1); cell.setCellValue(v); cell.setCellStyle(st); for (int i = c1 + 1; i <= c2; i++) { if (r.getCell(i) == null) r.createCell(i); r.getCell(i).setCellStyle(st); } s.addMergedRegion(new CellRangeAddress(r.getRowNum(), r.getRowNum(), c1, c2)); }
-    private void createValueMergedCell(Sheet s, Row r, int c1, int c2, double v, CellStyle st) { Cell cell = r.createCell(c1); cell.setCellValue(v / 24.0); cell.setCellStyle(st); for (int i = c1 + 1; i <= c2; i++) { if (r.getCell(i) == null) r.createCell(i); r.getCell(i).setCellStyle(st); } s.addMergedRegion(new CellRangeAddress(r.getRowNum(), r.getRowNum(), c1, c2)); }
-    private void createFormulaMergedCell(Sheet s, Row r, int c1, int c2, String f, CellStyle st) { Cell cell = r.createCell(c1); cell.setCellFormula(f); cell.setCellStyle(st); for (int i = c1 + 1; i <= c2; i++) { if (r.getCell(i) == null) r.createCell(i); r.getCell(i).setCellStyle(st); } s.addMergedRegion(new CellRangeAddress(r.getRowNum(), r.getRowNum(), c1, c2)); }
-    private Row getOrCreateRow(Sheet s, int idx) { Row r = s.getRow(idx); return r == null ? s.createRow(idx) : r; }
+    private void createCell(Row r, int c, String v, CellStyle s) {
+        Cell cell = r.getCell(c);
+        if (cell == null) cell = r.createCell(c);
+        cell.setCellValue(v);
+        if (s != null) cell.setCellStyle(s);
+    }
+
+    private void createValueCell(Row r, int c, double v, CellStyle s) {
+        Cell cell = r.getCell(c);
+        if (cell == null) cell = r.createCell(c);
+        cell.setCellValue(v / 24.0);
+        cell.setCellStyle(s);
+    }
+
+    private void createFormulaCell(Row r, int c, String f, CellStyle s) {
+        Cell cell = r.getCell(c);
+        if (cell == null) cell = r.createCell(c);
+        cell.setCellFormula(f);
+        cell.setCellStyle(s);
+    }
+
+    private void createMergedCell(Sheet s, Row r, int c1, int c2, String v, CellStyle st) {
+        Cell cell = r.createCell(c1);
+        cell.setCellValue(v);
+        cell.setCellStyle(st);
+        for (int i = c1 + 1; i <= c2; i++) {
+            if (r.getCell(i) == null) r.createCell(i);
+            r.getCell(i).setCellStyle(st);
+        }
+        s.addMergedRegion(new CellRangeAddress(r.getRowNum(), r.getRowNum(), c1, c2));
+    }
+
+    private void createValueMergedCell(Sheet s, Row r, int c1, int c2, double v, CellStyle st) {
+        Cell cell = r.createCell(c1);
+        cell.setCellValue(v / 24.0);
+        cell.setCellStyle(st);
+        for (int i = c1 + 1; i <= c2; i++) {
+            if (r.getCell(i) == null) r.createCell(i);
+            r.getCell(i).setCellStyle(st);
+        }
+        s.addMergedRegion(new CellRangeAddress(r.getRowNum(), r.getRowNum(), c1, c2));
+    }
+
+    private void createFormulaMergedCell(Sheet s, Row r, int c1, int c2, String f, CellStyle st) {
+        Cell cell = r.createCell(c1);
+        cell.setCellFormula(f);
+        cell.setCellStyle(st);
+        for (int i = c1 + 1; i <= c2; i++) {
+            if (r.getCell(i) == null) r.createCell(i);
+            r.getCell(i).setCellStyle(st);
+        }
+        s.addMergedRegion(new CellRangeAddress(r.getRowNum(), r.getRowNum(), c1, c2));
+    }
+
+    private Row getOrCreateRow(Sheet s, int idx) {
+        Row r = s.getRow(idx);
+        return r == null ? s.createRow(idx) : r;
+    }
+
     private void clearOldTablesArea(Sheet sheet, int rowStart, int rowEnd) {
         for (int i = sheet.getNumMergedRegions() - 1; i >= 0; i--) {
             CellRangeAddress region = sheet.getMergedRegion(i);
@@ -264,27 +312,119 @@ public class EditorService {
             }
         }
     }
-    private double calculateSumColumnF(Sheet s) { double sum = 0; for (int r = 8; r <= 38; r++) sum += getCellValue(s, r, 5); return sum; }
-    private double calculateSumAbsences(Sheet s) { double sum = 0; for (int r = 8; r <= 38; r++) for (int c = 11; c <= 19; c++) sum += getCellValue(s, r, c); return sum; }
-    private double calculateUsedVacation(Sheet s) { double used = 0; for (int r = 8; r <= 38; r++) { if ("UW".equals(getCellText(s, r, 2))) used += getCellValue(s, r, 11); } return used; }
-    private double getCellValue(Sheet s, int r, int c) { Row row = s.getRow(r); if (row == null) return 0; Cell cell = row.getCell(c); if (cell != null && cell.getCellType() == CellType.NUMERIC) return cell.getNumericCellValue() * 24.0; return 0; }
-    private int extractYear(File f){try(FileInputStream i=new FileInputStream(f);Workbook w=new XSSFWorkbook(i)){Matcher m=Pattern.compile("\\d{4}").matcher(getCellText(w.getSheetAt(0),3,6));if(m.find())return Integer.parseInt(m.group());}catch(Exception e){}return 0;}
-    private String getCellText(Sheet s, int r, int c){Row row=s.getRow(r);return (row==null||row.getCell(c)==null)?"":row.getCell(c).toString();}
-    private int detectStartMonth(Workbook wb){for(int i=0;i<wb.getNumberOfSheets();i++){Sheet s=wb.getSheetAt(i);for(int r=8;r<=38;r++){if(parseEtat(getCellText(s,r,23))!=null)return i+1;}}return 1;}
-    private Double parseEtat(String t){try{String c=t.replaceAll("[^0-9/.,]","").replace(",",".");if(c.contains("/")){String[]p=c.split("/");return Double.parseDouble(p[0])/Double.parseDouble(p[1]);}return Double.parseDouble(c);}catch(Exception e){return null;}}
-    private boolean isPolishHoliday(LocalDate d){int m=d.getMonthValue(),day=d.getDayOfMonth();return (m==1&&(day==1||day==6))||(m==5&&(day==1||day==3))||(m==8&&day==15)||(m==11&&(day==1||day==11))||(m==12&&(day==25||day==26));}
+
+    private double calculateSumColumnF(Sheet s) {
+        double sum = 0;
+        for (int r = 8; r <= 38; r++) sum += getCellValue(s, r, 5);
+        return sum;
+    }
+
+    private double calculateSumAbsences(Sheet s) {
+        double sum = 0;
+        for (int r = 8; r <= 38; r++) for (int c = 11; c <= 19; c++) sum += getCellValue(s, r, c);
+        return sum;
+    }
+
+    private double calculateUsedVacation(Sheet s) {
+        double used = 0;
+        for (int r = 8; r <= 38; r++) {
+            if ("UW".equals(getCellText(s, r, 2))) used += getCellValue(s, r, 11);
+        }
+        return used;
+    }
+
+    private double getCellValue(Sheet s, int r, int c) {
+        Row row = s.getRow(r);
+        if (row == null) return 0;
+        Cell cell = row.getCell(c);
+        if (cell != null && cell.getCellType() == CellType.NUMERIC) return cell.getNumericCellValue() * 24.0;
+        return 0;
+    }
+
+    private int extractYear(File f) {
+        try (FileInputStream i = new FileInputStream(f); Workbook w = new XSSFWorkbook(i)) {
+            Matcher m = Pattern.compile("\\d{4}").matcher(getCellText(w.getSheetAt(0), 3, 6));
+            if (m.find()) return Integer.parseInt(m.group());
+        } catch (Exception e) {
+        }
+        return 0;
+    }
+
+    private String getCellText(Sheet s, int r, int c) {
+        Row row = s.getRow(r);
+        return (row == null || row.getCell(c) == null) ? "" : row.getCell(c).toString();
+    }
+
+    private int detectStartMonth(Workbook wb) {
+        for (int i = 0; i < wb.getNumberOfSheets(); i++) {
+            Sheet s = wb.getSheetAt(i);
+            for (int r = 8; r <= 38; r++) {
+                if (parseEtat(getCellText(s, r, 23)) != null) return i + 1;
+            }
+        }
+        return 1;
+    }
+
+    private Double parseEtat(String t) {
+        try {
+            String c = t.replaceAll("[^0-9/.,]", "").replace(",", ".");
+            if (c.contains("/")) {
+                String[] p = c.split("/");
+                return Double.parseDouble(p[0]) / Double.parseDouble(p[1]);
+            }
+            return Double.parseDouble(c);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private boolean isPolishHoliday(LocalDate d) {
+        int m = d.getMonthValue(), day = d.getDayOfMonth();
+        return (m == 1 && (day == 1 || day == 6)) || (m == 5 && (day == 1 || day == 3)) || (m == 8 && day == 15) || (m == 11 && (day == 1 || day == 11)) || (m == 12 && (day == 25 || day == 26));
+    }
+
     private List<MonthStatus> buildYearMap(Workbook wb, int y, int sd, List<VacationEvent> evs) {
         List<MonthStatus> map = new ArrayList<>();
         for (int m = 1; m <= 12; m++) {
-            Sheet sheet = wb.getSheetAt(Math.min(m - 1, wb.getNumberOfSheets()-1));
-            Double fte = null; String txt = "1/1";
-            for (int r = 8; r <= 39; r++) { fte = parseEtat(getCellText(sheet, r, 23)); if (fte != null) { txt = getCellText(sheet, r, 23); break; } }
-            if (fte == null) { Double hF = parseEtat(getCellText(sheet, 7, 23)); if (hF != null) { fte = hF; txt = getCellText(sheet, 7, 23); } else { fte = 1.0; } }
-            int dim = sd; for (VacationEvent e : evs) { if (e.getDate().getYear() < y || (e.getDate().getYear() == y && e.getDate().getMonthValue() <= m)) dim = e.getNewDimension(); }
+            Sheet sheet = wb.getSheetAt(Math.min(m - 1, wb.getNumberOfSheets() - 1));
+            Double fte = null;
+            String txt = "1/1";
+            for (int r = 8; r <= 39; r++) {
+                fte = parseEtat(getCellText(sheet, r, 23));
+                if (fte != null) {
+                    txt = getCellText(sheet, r, 23);
+                    break;
+                }
+            }
+            if (fte == null) {
+                Double hF = parseEtat(getCellText(sheet, 7, 23));
+                if (hF != null) {
+                    fte = hF;
+                    txt = getCellText(sheet, 7, 23);
+                } else {
+                    fte = 1.0;
+                }
+            }
+            int dim = sd;
+            for (VacationEvent e : evs) {
+                if (e.getDate().getYear() < y || (e.getDate().getYear() == y && e.getDate().getMonthValue() <= m)) dim = e.getNewDimension();
+            }
             map.add(new MonthStatus(m, fte, txt, dim));
         }
         return map;
     }
 
-    private static class MonthStatus { int monthIndex; double fte; String fteText; int dimension; public MonthStatus(int m, double f, String t, int d) { this.monthIndex = m; this.fte = f; this.fteText = t; this.dimension = d; } }
+    private static class MonthStatus {
+        int monthIndex;
+        double fte;
+        String fteText;
+        int dimension;
+
+        public MonthStatus(int m, double f, String t, int d) {
+            this.monthIndex = m;
+            this.fte = f;
+            this.fteText = t;
+            this.dimension = d;
+        }
+    }
 }
