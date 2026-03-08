@@ -13,6 +13,14 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Panel do edycji i przetwarzania istniejących plików ewidencji.
+ * Umożliwia użytkownikowi wybranie plików, zdefiniowanie parametrów początkowych
+ * (urlop zaległy, wymiar bazowy) oraz zdarzeń wpływających na wymiar urlopu.
+ * Pozwala na uruchomienie dwóch głównych procesów:
+ * 1. Aktualizacja i przeliczenie sald w istniejących plikach Excel.
+ * 2. Wygenerowanie zbiorczej, rocznej karty urlopowej.
+ */
 public class EditorPanel extends JPanel {
 
     private final ViewNavigator navigator;
@@ -29,19 +37,26 @@ public class EditorPanel extends JPanel {
     private DefaultTableModel eventsTableModel;
     private JTable eventsTable;
 
+    /**
+     * Tworzy panel edytora.
+     * @param navigator Obiekt nawigatora do obsługi powrotu do menu.
+     */
     public EditorPanel(ViewNavigator navigator) {
         this.navigator = navigator;
         setLayout(new BorderLayout());
         setBorder(new EmptyBorder(10, 10, 10, 10));
 
+        // --- Panel górny (powrót) ---
         JPanel top = new JPanel(new FlowLayout(FlowLayout.LEFT));
         JButton btnBack = new JButton("<< Wroc");
         btnBack.addActionListener(e -> navigator.showMenu());
         top.add(btnBack);
         add(top, BorderLayout.NORTH);
 
+        // --- Panel centralny (listy i ustawienia) ---
         JPanel center = new JPanel(new GridLayout(1, 2, 10, 0));
 
+        // Lewa strona: lista plików
         JPanel leftPanel = new JPanel(new BorderLayout());
         leftPanel.setBorder(BorderFactory.createTitledBorder("1. Pliki Excel (Lata)"));
         listModel = new DefaultListModel<>();
@@ -52,6 +67,7 @@ public class EditorPanel extends JPanel {
         btnSelect.addActionListener(e -> selectFiles());
         leftPanel.add(btnSelect, BorderLayout.SOUTH);
 
+        // Prawa strona: ustawienia i zdarzenia
         JPanel rightPanel = new JPanel(new BorderLayout());
         rightPanel.setBorder(BorderFactory.createTitledBorder("2. Zdarzenia (Zmiana wymiaru)"));
 
@@ -63,7 +79,6 @@ public class EditorPanel extends JPanel {
         startConfig.add(new JLabel("Wymiar startowy (1 sty):"));
         fieldBaseYearlyDays = new JTextField("26");
         startConfig.add(fieldBaseYearlyDays);
-
         rightPanel.add(startConfig, BorderLayout.NORTH);
 
         String[] columns = {"Data (RRRR-MM-DD)", "Nowy Wymiar", "Opis"};
@@ -87,6 +102,7 @@ public class EditorPanel extends JPanel {
         center.add(rightPanel);
         add(center, BorderLayout.CENTER);
 
+        // --- Panel dolny (akcje i postęp) ---
         JPanel bottom = new JPanel(new BorderLayout(5, 5));
         JPanel actionButtons = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 10));
 
@@ -117,6 +133,9 @@ public class EditorPanel extends JPanel {
         add(bottom, BorderLayout.SOUTH);
     }
 
+    /**
+     * Wyświetla okno dialogowe do dodawania nowego zdarzenia zmiany wymiaru urlopu.
+     */
     private void addEventDialog() {
         JTextField dField = new JTextField("2025-03-24");
         JTextField wField = new JTextField("36");
@@ -128,6 +147,9 @@ public class EditorPanel extends JPanel {
         }
     }
 
+    /**
+     * Otwiera okno wyboru plików i dodaje wybrane pliki do listy.
+     */
     private void selectFiles() {
         JFileChooser chooser = new JFileChooser();
         chooser.setMultiSelectionEnabled(true);
@@ -141,6 +163,10 @@ public class EditorPanel extends JPanel {
         }
     }
 
+    /**
+     * Konwertuje dane z tabeli zdarzeń na listę obiektów {@link VacationEvent}.
+     * @return Lista zdarzeń urlopowych.
+     */
     private List<VacationEvent> getEventsFromTable() {
         List<VacationEvent> events = new ArrayList<>();
         for (int i = 0; i < eventsTableModel.getRowCount(); i++) {
@@ -150,11 +176,16 @@ public class EditorPanel extends JPanel {
                 String desc = (String) eventsTableModel.getValueAt(i, 2);
                 events.add(new VacationEvent(LocalDate.parse(d), dim, desc));
             } catch (Exception e) {
+                // Ignoruje błędnie sformatowane wiersze
             }
         }
         return events;
     }
 
+    /**
+     * Uruchamia w osobnym wątku proces aktualizacji plików Excel.
+     * Zbiera dane z formularza i przekazuje je do {@link EditorService}.
+     */
     private void runUpdate() {
         if (selectedFiles.isEmpty()) return;
         new Thread(() -> {
@@ -176,6 +207,11 @@ public class EditorPanel extends JPanel {
         }).start();
     }
 
+    /**
+     * Uruchamia w osobnym wątku proces generowania rocznej karty urlopowej.
+     * Prosi użytkownika o wskazanie katalogu docelowego, a następnie przekazuje dane
+     * do {@link VacationReportGenerator}.
+     */
     private void runReportGeneration() {
         if (selectedFiles.isEmpty()) return;
         JFileChooser chooser = new JFileChooser();

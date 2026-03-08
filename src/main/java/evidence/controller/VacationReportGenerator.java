@@ -15,9 +15,15 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/**
+ * Generator raportów urlopowych w formacie Excel.
+ * Tworzy szczegółową kartę ewidencji urlopów dla każdego pracownika na podstawie
+ * rocznych plików ewidencji czasu pracy.
+ */
 public class VacationReportGenerator {
     private static final double POOL_CONVERSION_FACTOR = 7.0 + (35.0 / 60.0);
 
+    /** Wewnętrzna klasa reprezentująca pojedynczy wpis urlopowy. */
     private static class VacationEntry {
         LocalDate start, end;
         double hoursUsed;
@@ -31,6 +37,7 @@ public class VacationReportGenerator {
         }
     }
 
+    /** Wewnętrzna klasa przechowująca status dla danego miesiąca (etat, wymiar urlopu). */
     private static class MonthStatus {
         int monthIndex;
         double fte;
@@ -45,6 +52,7 @@ public class VacationReportGenerator {
         }
     }
 
+    /** Wewnętrzna klasa reprezentująca okres zatrudnienia w danym wymiarze etatu. */
     private static class FTEPeriod {
         int startMonth, endMonth;
         double fte;
@@ -58,10 +66,21 @@ public class VacationReportGenerator {
         }
     }
 
+    /** Interfejs do raportowania postępu generowania raportów. */
     public interface ProgressListener {
         void update(String status, int current, int total);
     }
 
+    /**
+     * Generuje raporty urlopowe dla wszystkich pracowników na podstawie dostarczonych plików.
+     * Grupuje pliki per pracownik i dla każdego tworzy osobny raport.
+     *
+     * @param files Lista plików ewidencji czasu pracy do przetworzenia.
+     * @param outputDir Katalog, w którym zostaną zapisane wygenerowane raporty.
+     * @param baseYearlyDays Bazowy roczny wymiar urlopu (np. 20 lub 26).
+     * @param events Lista zdarzeń wpływających na wymiar urlopu (np. zmiana stażu pracy).
+     * @param listener Obiekt do raportowania postępu.
+     */
     public void generateReport(List<File> files, File outputDir, int baseYearlyDays, List<VacationEvent> events, ProgressListener listener) {
         try {
             listener.update("Analiza plikow...", 0, 0);
@@ -81,6 +100,17 @@ public class VacationReportGenerator {
         }
     }
 
+    /**
+     * Generuje pojedynczy raport urlopowy dla jednego pracownika.
+     * Analizuje wszystkie roczne pliki ewidencji danego pracownika i tworzy z nich zbiorczą kartę urlopową.
+     *
+     * @param employee Nazwa pracownika.
+     * @param files Lista plików ewidencji dla tego pracownika.
+     * @param dir Katalog wyjściowy.
+     * @param baseYearlyDays Bazowy wymiar urlopu.
+     * @param events Lista zdarzeń urlopowych.
+     * @throws IOException W przypadku problemów z I/O.
+     */
     private void generateEmployeeReport(String employee, List<File> files, File dir, int baseYearlyDays, List<VacationEvent> events) throws IOException {
         Workbook wb = new XSSFWorkbook();
 
@@ -142,6 +172,14 @@ public class VacationReportGenerator {
         }
     }
 
+    /**
+     * Buduje mapę statusów (etat, wymiar urlopu) dla każdego miesiąca w roku na podstawie pliku ewidencji.
+     * @param file Plik ewidencji na dany rok.
+     * @param year Rok.
+     * @param startDim Początkowy wymiar urlopu.
+     * @param events Zdarzenia wpływające na wymiar urlopu.
+     * @return Lista statusów dla każdego miesiąca.
+     */
     private List<MonthStatus> buildYearMap(File file, int year, int startDim, List<VacationEvent> events) {
         List<FTEPeriod> ftePeriods = new ArrayList<>();
         try (FileInputStream fis = new FileInputStream(file); Workbook wb = new XSSFWorkbook(fis)) {
@@ -172,6 +210,10 @@ public class VacationReportGenerator {
         return map;
     }
 
+    /**
+     * Buduje pustą mapę statusów na rok, w którym brakowało pliku ewidencji.
+     * Zakłada stały etat 1/1.
+     */
     private List<MonthStatus> buildEmptyYearMap(int year, int startDim, List<VacationEvent> events) {
         List<MonthStatus> map = new ArrayList<>();
         for (int m = 1; m <= 12; m++) {
@@ -186,6 +228,11 @@ public class VacationReportGenerator {
         return map;
     }
 
+    /**
+     * Oblicza roczną pulę urlopową w godzinach, uwzględniając zmiany etatu i wymiaru w ciągu roku.
+     * @param map Lista statusów dla każdego miesiąca.
+     * @return Całkowita pula urlopowa w godzinach.
+     */
     private double calculateComplexPool(List<MonthStatus> map) {
         double totalDays = 0;
         int groupStart = 0;
@@ -205,6 +252,11 @@ public class VacationReportGenerator {
         return totalDays * POOL_CONVERSION_FACTOR;
     }
 
+    /**
+     * Analizuje roczny plik ewidencji w celu znalezienia okresów o różnym wymiarze etatu.
+     * @param wb Skoroszyt z ewidencją roczną.
+     * @return Lista okresów z określonym wymiarem etatu.
+     */
     private List<FTEPeriod> analyzeYearlyEmployment(Workbook wb) {
         List<FTEPeriod> periods = new ArrayList<>();
         FTEPeriod current = null;
@@ -242,6 +294,11 @@ public class VacationReportGenerator {
         return periods;
     }
 
+    /**
+     * Rysuje w arkuszu sekcję dla jednego roku kalendarzowego.
+     * Zawiera nagłówek roku, pulę urlopową oraz listę wykorzystanych urlopów.
+     * @return Nowy numer bieżącego wiersza po narysowaniu sekcji.
+     */
     private int drawYearSection(Sheet sheet, int r, int year, String desc, double overdue, double pool, List<VacationEntry> entries,
                                 CellStyle header, CellStyle center, CellStyle left, CellStyle date, CellStyle time) {
         Row title = sheet.createRow(r++);
@@ -293,6 +350,12 @@ public class VacationReportGenerator {
         return r;
     }
 
+    /**
+     * Wyodrębnia z pliku ewidencji listę wykorzystanych urlopów (UW i UO).
+     * @param file Plik ewidencji.
+     * @param year Rok, którego dotyczy plik.
+     * @return Lista obiektów {@link VacationEntry}.
+     */
     private List<VacationEntry> extractVacationsFromFile(File file, int year) {
         List<VacationEntry> list = new ArrayList<>();
         try (FileInputStream fis = new FileInputStream(file); Workbook wb = new XSSFWorkbook(fis)) {
@@ -317,6 +380,9 @@ public class VacationReportGenerator {
         }
     }
 
+    /**
+     * Parsuje czas w formacie Excel (ułamek dnia) na godziny.
+     */
     private double parseTime(String s) {
         try {
             return Double.parseDouble(s) * 24.0;
@@ -325,6 +391,9 @@ public class VacationReportGenerator {
         }
     }
 
+    /**
+     * Parsuje tekst w poszukiwaniu wymiaru etatu (np. "1/2", "0.75").
+     */
     private Double parseEtat(String t) {
         try {
             String c = t.replaceAll("[^0-9/.,]", "").replace(",", ".");
@@ -338,11 +407,17 @@ public class VacationReportGenerator {
         }
     }
 
+    /**
+     * Pobiera tekstową zawartość komórki.
+     */
     private String getCellText(Sheet s, int r, int c) {
         Row row = s.getRow(r);
         return (row == null || row.getCell(c) == null) ? "" : row.getCell(c).toString();
     }
 
+    /**
+     * Tworzy komórkę i ustawia jej wartość oraz styl.
+     */
     private void createCell(Row r, int c, Object v, CellStyle s) {
         Cell cell = r.createCell(c);
         if (v instanceof String) cell.setCellValue((String) v);
@@ -352,6 +427,9 @@ public class VacationReportGenerator {
         cell.setCellStyle(s);
     }
 
+    /**
+     * Wyodrębnia rok z pliku ewidencji na podstawie zawartości komórki nagłówkowej.
+     */
     private int extractYearFromFile(File f) {
         try (FileInputStream i = new FileInputStream(f); Workbook w = new XSSFWorkbook(i)) {
             Matcher m = Pattern.compile("\\d{4}").matcher(getCellText(w.getSheetAt(0), 3, 6));
@@ -361,6 +439,9 @@ public class VacationReportGenerator {
         return 0;
     }
 
+    /**
+     * Wyodrębnia nazwę pracownika z pliku ewidencji na podstawie zawartości komórki nagłówkowej.
+     */
     private String extractNameFromFile(File f) {
         try (FileInputStream i = new FileInputStream(f); Workbook w = new XSSFWorkbook(i)) {
             String h = getCellText(w.getSheetAt(0), 3, 6);
@@ -370,12 +451,20 @@ public class VacationReportGenerator {
         return "Pracownik";
     }
 
+    /**
+     * Grupuje listę plików ewidencji według nazwisk pracowników.
+     * @param fs Lista plików do pogrupowania.
+     * @return Mapa, gdzie kluczem jest nazwisko pracownika, a wartością lista jego plików.
+     */
     private Map<String, List<File>> groupFilesByEmployee(List<File> fs) {
         Map<String, List<File>> m = new HashMap<>();
         for (File f : fs) m.computeIfAbsent(extractNameFromFile(f), k -> new ArrayList<>()).add(f);
         return m;
     }
 
+    /**
+     * Tworzy i konfiguruje styl komórki.
+     */
     private CellStyle createStyle(Workbook wb, boolean bold, boolean center, IndexedColors bg) {
         CellStyle s = wb.createCellStyle();
         if (bold) {
@@ -397,6 +486,9 @@ public class VacationReportGenerator {
         return s;
     }
 
+    /**
+     * Tworzy główny nagłówek na karcie ewidencji urlopów.
+     */
     private void createMainHeader(Sheet s, String name, int b, Workbook wb) {
         CellStyle st = wb.createCellStyle();
         Font f = wb.createFont();
@@ -412,6 +504,9 @@ public class VacationReportGenerator {
         s.addMergedRegion(new CellRangeAddress(2, 2, 0, 3));
     }
 
+    /**
+     * Ustawia szerokości kolumn w arkuszu raportu.
+     */
     private void setupSheetLayout(Sheet s) {
         s.setColumnWidth(0, 1500);
         s.setColumnWidth(1, 3000);
@@ -422,6 +517,11 @@ public class VacationReportGenerator {
         s.setColumnWidth(6, 10000);
     }
 
+    /**
+     * Generuje opis zmian etatu i wymiaru urlopu w ciągu roku.
+     * @param m Lista statusów dla każdego miesiąca.
+     * @return Tekstowy opis zmian.
+     */
     private String generateDescription(List<MonthStatus> m) {
         StringBuilder sb = new StringBuilder();
         int d = -1;

@@ -34,6 +34,14 @@ public class ApachePoiExcelService implements EvidenceController {
         ABSENCE_COLUMNS.put("NN", 19);
     }
 
+    /**
+     * Generuje plik Excel z ewidencją czasu pracy na podstawie dostarczonych danych.
+     * Metoda wczytuje szablon, przetwarza każdy miesiąc, wypełniając go danymi o pracy,
+     * nieobecnościach i urlopach, a następnie zapisuje wynik do nowego pliku.
+     *
+     * @param request Obiekt zawierający wszystkie dane potrzebne do wygenerowania ewidencji.
+     * @throws IOException W przypadku problemów z odczytem szablonu lub zapisem pliku wynikowego.
+     */
     @Override
     public void generateEvidence(EvidenceRequest request) throws IOException {
         try (FileInputStream fis = new FileInputStream(request.getTemplateFile());
@@ -72,6 +80,13 @@ public class ApachePoiExcelService implements EvidenceController {
         }
     }
 
+    /**
+     * Oblicza i przygotowuje notatki o zmianach wymiaru etatu w ciągu roku.
+     * Porównuje kolejne okresy zatrudnienia i tworzy notatkę w dniu, w którym następuje zmiana.
+     *
+     * @param periods Lista okresów zatrudnienia pracownika.
+     * @return Mapa, gdzie kluczem jest data zmiany etatu, a wartością notatka o tej zmianie.
+     */
     private Map<LocalDate, String> calculateEtatChangeNotes(List<SchedulePeriod> periods) {
         Map<LocalDate, String> notes = new HashMap<>();
         periods.sort(Comparator.comparing(SchedulePeriod::getStart));
@@ -87,6 +102,20 @@ public class ApachePoiExcelService implements EvidenceController {
         return notes;
     }
 
+    /**
+     * Przetwarza pojedynczy arkusz Excel, odpowiadający jednemu miesiącowi.
+     * Wypełnia nagłówki, dane dzienne oraz podsumowanie miesiąca.
+     *
+     * @param sheet Arkusz Excel do przetworzenia.
+     * @param month Numer miesiąca (1-12).
+     * @param request Główne dane wejściowe.
+     * @param fontStandard Standardowa czcionka używana w arkuszu.
+     * @param fontEtatHeader Czcionka dla nagłówka etatu.
+     * @param fontNote Czcionka dla notatek.
+     * @param absenceMap Mapa nieobecności.
+     * @param etatChangeNotes Mapa notatek o zmianie etatu.
+     * @param summaries Mapa podsumowań urlopowych dla każdego miesiąca.
+     */
     private void processMonthSheet(Sheet sheet, int month, EvidenceRequest request,
                                    Font fontStandard, Font fontEtatHeader, Font fontNote,
                                    Map<LocalDate, AbsenceData> absenceMap,
@@ -184,6 +213,13 @@ public class ApachePoiExcelService implements EvidenceController {
         }
     }
 
+    /**
+     * Znajduje okres harmonogramu, który jest aktywny dla podanej daty.
+     *
+     * @param date Data, dla której szukany jest harmonogram.
+     * @param periods Lista wszystkich okresów harmonogramu.
+     * @return Aktywny {@link SchedulePeriod} lub null, jeśli żaden nie pasuje.
+     */
     private SchedulePeriod getScheduleForDate(LocalDate date, List<SchedulePeriod> periods) {
         for (SchedulePeriod sp : periods) {
             if (sp.covers(date)) return sp;
@@ -191,6 +227,18 @@ public class ApachePoiExcelService implements EvidenceController {
         return null;
     }
 
+    /**
+     * Wypełnia pojedynczy wiersz w arkuszu, odpowiadający jednemu dniu.
+     * Obsługuje dni robocze, weekendy, święta, nieobecności oraz notatki.
+     *
+     * @param row Wiersz do wypełnienia.
+     * @param date Aktualna data.
+     * @param request Główne dane wejściowe.
+     * @param fontStandard Standardowa czcionka.
+     * @param fontNote Czcionka dla notatek.
+     * @param absence Dane o nieobecności w tym dniu (lub null).
+     * @param changeNote Notatka o zmianie etatu w tym dniu (lub null).
+     */
     private void fillDayRow(Row row, LocalDate date, EvidenceRequest request,
                             Font fontStandard, Font fontNote,
                             AbsenceData absence, String changeNote) {
@@ -287,6 +335,14 @@ public class ApachePoiExcelService implements EvidenceController {
         }
     }
 
+    /**
+     * Aplikuje styl do komórki, klonując istniejący styl, aby uniknąć modyfikacji
+     * współdzielonych obiektów stylów. Ustawia formatowanie, czcionkę i wyrównanie.
+     *
+     * @param cell Komórka do ostylowania.
+     * @param formatStr Format danych (np. "HH:mm", "General").
+     * @param font Czcionka do zastosowania.
+     */
     private void applyStyle(Cell cell, String formatStr, Font font) {
         Workbook wb = cell.getSheet().getWorkbook();
         CellStyle originalStyle = cell.getCellStyle();
@@ -300,6 +356,12 @@ public class ApachePoiExcelService implements EvidenceController {
         cell.setCellStyle(newStyle);
     }
 
+    /**
+     * Czyści zawartość wszystkich komórek w danym wierszu.
+     * Używane dla dni, które nie istnieją w danym miesiącu (np. 30 lutego).
+     *
+     * @param row Wiersz do wyczyszczenia.
+     */
     private void clearRow(Row row) {
         for (int i = 0; i <= 23; i++) {
             Cell c = row.getCell(i);
@@ -307,12 +369,28 @@ public class ApachePoiExcelService implements EvidenceController {
         }
     }
 
+    /**
+     * Pobiera komórkę z wiersza. Jeśli komórka nie istnieje, tworzy ją.
+     * Zapobiega to błędom NullPointerException.
+     *
+     * @param row Wiersz, z którego pobierana jest komórka.
+     * @param colIndex Indeks kolumny.
+     * @return Istniejąca lub nowo utworzona komórka.
+     */
     private Cell createCellIfMissing(Row row, int colIndex) {
         Cell c = row.getCell(colIndex);
         if (c == null) c = row.createCell(colIndex);
         return c;
     }
 
+    /**
+     * Zapisuje skoroszyt (Workbook) do pliku. Nazwa pliku jest generowana
+     * na podstawie imienia, nazwiska pracownika i roku.
+     *
+     * @param workbook Skoroszyt do zapisania.
+     * @param request Dane wejściowe, używane do wygenerowania nazwy pliku.
+     * @throws IOException W przypadku problemu z zapisem pliku.
+     */
     private void saveWorkbook(Workbook workbook, EvidenceRequest request) throws IOException {
         String formattedName = request.getEmployeeName().replaceAll("(?<=\\p{Ll})(?=\\p{Lu})", " ");
         String filename = "Ewidencja_" + formattedName.replace(" ", "_") + "_" + request.getYear() + ".xlsx";

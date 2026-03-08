@@ -20,10 +20,30 @@ import java.util.regex.Pattern;
 public class EditorService {
     private static final double POOL_CONVERSION_FACTOR = 7.0 + (35.0 / 60.0);
 
+    /**
+     * Interfejs do raportowania postępu przetwarzania plików.
+     */
     public interface ProgressListener {
+        /**
+         * Wywoływane w celu aktualizacji statusu postępu.
+         * @param status Opis bieżącej operacji.
+         * @param current Numer aktualnie przetwarzanego elementu.
+         * @param total Całkowita liczba elementów do przetworzenia.
+         */
         void update(String status, int current, int total);
     }
 
+    /**
+     * Przetwarza łańcuch plików ewidencji czasu pracy w porządku chronologicznym.
+     * Każdy plik jest aktualizowany na podstawie wyników z poprzedniego,
+     * przenosząc bilans urlopu zaległego i nadgodzin.
+     *
+     * @param files Lista plików do przetworzenia.
+     * @param startOverdueDays Początkowa liczba dni urlopu zaległego.
+     * @param baseDimStartOfYear Bazowy wymiar urlopu na początku pierwszego roku.
+     * @param events Lista zdarzeń wpływających na wymiar urlopu.
+     * @param listener Obiekt do raportowania postępu.
+     */
     public void processFilesChain(List<File> files, int startOverdueDays, int baseDimStartOfYear, List<VacationEvent> events, ProgressListener listener) {
         files.sort((f1, f2) -> Integer.compare(extractYear(f1), extractYear(f2)));
 
@@ -46,6 +66,20 @@ public class EditorService {
         listener.update("Zakonczono.", count, count);
     }
 
+    /**
+     * Aktualizuje pojedynczy plik Excel z ewidencją czasu pracy.
+     * Oblicza normy czasu pracy, bilans urlopów i nadgodzin dla każdego miesiąca,
+     * a następnie rysuje w arkuszach odpowiednie tabele podsumowujące.
+     *
+     * @param file Plik do aktualizacji.
+     * @param year Rok, którego dotyczy ewidencja.
+     * @param startOverdueHours Początkowa liczba godzin urlopu zaległego.
+     * @param startOvertimeBalance Początkowy bilans nadgodzin.
+     * @param baseDimStartOfYear Bazowy wymiar urlopu na początku roku.
+     * @param events Lista zdarzeń wpływających na wymiar urlopu.
+     * @return Tablica double zawierająca końcowy bilans urlopu i nadgodzin.
+     * @throws IOException W przypadku problemów z odczytem lub zapisem pliku.
+     */
     private double[] updateSingleFile(File file, int year, double startOverdueHours, double startOvertimeBalance, int baseDimStartOfYear, List<VacationEvent> events) throws IOException {
         try (FileInputStream fis = new FileInputStream(file);
              Workbook workbook = new XSSFWorkbook(fis)) {
@@ -93,6 +127,11 @@ public class EditorService {
         }
     }
 
+    /**
+     * Generuje opis zmian etatu i wymiaru urlopu w ciągu roku.
+     * @param map Lista statusów dla każdego miesiąca.
+     * @return Tekstowy opis zmian.
+     */
     private String generateDescription(List<MonthStatus> map) {
         StringBuilder sb = new StringBuilder();
         double lastFte = -1;
@@ -108,6 +147,20 @@ public class EditorService {
         return sb.toString();
     }
 
+    /**
+     * Rysuje tabele podsumowujące w arkuszu miesiąca.
+     * Tabele zawierają informacje o normatywnym czasie pracy, bilansie urlopów i nadgodzin.
+     *
+     * @param sheet Arkusz, w którym rysowane są tabele.
+     * @param startRow Wiersz początkowy dla tabel.
+     * @param normParts Obliczone części normy czasu pracy.
+     * @param initOverdue Początkowy urlop zaległy.
+     * @param yearPool Pula urlopu na bieżący rok.
+     * @param initOvertime Początkowe nadgodziny.
+     * @param note Notatka do wyświetlenia.
+     * @param isFirstMonth Czy to pierwszy przetwarzany miesiąc w pliku.
+     * @param prevSheet Nazwa poprzedniego arkusza (do formuł).
+     */
     private void drawRequestedTables(Sheet sheet, int startRow, double[] normParts, double initOverdue, double yearPool, double initOvertime, String note, boolean isFirstMonth, String prevSheet) {
         Workbook wb = sheet.getWorkbook();
 
@@ -207,6 +260,13 @@ public class EditorService {
         createMergedCell(sheet, r46, 15, 23, note, noteStyle);
     }
 
+    /**
+     * Oblicza normatywny czas pracy dla danego miesiąca i etatu.
+     * @param year Rok.
+     * @param month Miesiąc.
+     * @param fte Wymiar etatu (np. 1.0 dla pełnego, 0.5 dla połowy).
+     * @return Tablica double z godzinami pracy w pełnych tygodniach i resztą.
+     */
     private double[] calculateNormParts(int year, int month, double fte) {
         LocalDate firstDay = LocalDate.of(year, month, 1);
         int daysInMonth = firstDay.lengthOfMonth();
@@ -246,6 +306,11 @@ public class EditorService {
         return new double[]{fullWeeksHours, restHours};
     }
 
+    /**
+     * Oblicza złożoną pulę urlopową na cały rok, uwzględniając zmiany etatu i wymiaru urlopu.
+     * @param map Lista statusów dla każdego miesiąca.
+     * @return Całkowita pula urlopowa w godzinach.
+     */
     private double calculateComplexPool(List<MonthStatus> map) {
         double totalDays = 0;
         for (MonthStatus ms : map) {
@@ -255,6 +320,9 @@ public class EditorService {
         return Math.ceil(totalDays) * POOL_CONVERSION_FACTOR;
     }
 
+    /**
+     * Tworzy komórkę z wartością tekstową i opcjonalnym stylem.
+     */
     private void createCell(Row r, int c, String v, CellStyle s) {
         Cell cell = r.getCell(c);
         if (cell == null) cell = r.createCell(c);
@@ -262,6 +330,9 @@ public class EditorService {
         if (s != null) cell.setCellStyle(s);
     }
 
+    /**
+     * Tworzy komórkę z wartością liczbową (godziny) i stylem.
+     */
     private void createValueCell(Row r, int c, double v, CellStyle s) {
         Cell cell = r.getCell(c);
         if (cell == null) cell = r.createCell(c);
@@ -269,6 +340,9 @@ public class EditorService {
         cell.setCellStyle(s);
     }
 
+    /**
+     * Tworzy komórkę z formułą i stylem.
+     */
     private void createFormulaCell(Row r, int c, String f, CellStyle s) {
         Cell cell = r.getCell(c);
         if (cell == null) cell = r.createCell(c);
@@ -276,6 +350,9 @@ public class EditorService {
         cell.setCellStyle(s);
     }
 
+    /**
+     * Tworzy scaloną komórkę z wartością tekstową i stylem.
+     */
     private void createMergedCell(Sheet s, Row r, int c1, int c2, String v, CellStyle st) {
         Cell cell = r.createCell(c1);
         cell.setCellValue(v);
@@ -287,6 +364,9 @@ public class EditorService {
         s.addMergedRegion(new CellRangeAddress(r.getRowNum(), r.getRowNum(), c1, c2));
     }
 
+    /**
+     * Tworzy scaloną komórkę z wartością liczbową (godziny) i stylem.
+     */
     private void createValueMergedCell(Sheet s, Row r, int c1, int c2, double v, CellStyle st) {
         Cell cell = r.createCell(c1);
         cell.setCellValue(v / 24.0);
@@ -298,6 +378,9 @@ public class EditorService {
         s.addMergedRegion(new CellRangeAddress(r.getRowNum(), r.getRowNum(), c1, c2));
     }
 
+    /**
+     * Tworzy scaloną komórkę z formułą i stylem.
+     */
     private void createFormulaMergedCell(Sheet s, Row r, int c1, int c2, String f, CellStyle st) {
         Cell cell = r.createCell(c1);
         cell.setCellFormula(f);
@@ -309,11 +392,18 @@ public class EditorService {
         s.addMergedRegion(new CellRangeAddress(r.getRowNum(), r.getRowNum(), c1, c2));
     }
 
+    /**
+     * Pobiera wiersz z arkusza, tworząc go, jeśli nie istnieje.
+     */
     private Row getOrCreateRow(Sheet s, int idx) {
         Row r = s.getRow(idx);
         return r == null ? s.createRow(idx) : r;
     }
 
+    /**
+     * Czyści obszar starych tabel podsumowujących w arkuszu.
+     * Usuwa scalone regiony i zawartość komórek.
+     */
     private void clearOldTablesArea(Sheet sheet, int rowStart, int rowEnd) {
         for (int i = sheet.getNumMergedRegions() - 1; i >= 0; i--) {
             CellRangeAddress region = sheet.getMergedRegion(i);
@@ -332,18 +422,27 @@ public class EditorService {
         }
     }
 
+    /**
+     * Oblicza sumę wartości w kolumnie F (przepracowane godziny).
+     */
     private double calculateSumColumnF(Sheet s) {
         double sum = 0;
         for (int r = 8; r <= 38; r++) sum += getCellValue(s, r, 5);
         return sum;
     }
 
+    /**
+     * Oblicza sumę godzin z tytułu nieobecności.
+     */
     private double calculateSumAbsences(Sheet s) {
         double sum = 0;
         for (int r = 8; r <= 38; r++) for (int c = 11; c <= 19; c++) sum += getCellValue(s, r, c);
         return sum;
     }
 
+    /**
+     * Oblicza sumę wykorzystanego urlopu wypoczynkowego (UW) w miesiącu.
+     */
     private double calculateUsedVacation(Sheet s) {
         double used = 0;
         for (int r = 8; r <= 38; r++) {
@@ -352,6 +451,9 @@ public class EditorService {
         return used;
     }
 
+    /**
+     * Pobiera numeryczną wartość komórki (w godzinach).
+     */
     private double getCellValue(Sheet s, int r, int c) {
         Row row = s.getRow(r);
         if (row == null) return 0;
@@ -360,6 +462,9 @@ public class EditorService {
         return 0;
     }
 
+    /**
+     * Wyodrębnia rok z nazwy pliku na podstawie komórki w arkuszu.
+     */
     private int extractYear(File f) {
         try (FileInputStream i = new FileInputStream(f); Workbook w = new XSSFWorkbook(i)) {
             Matcher m = Pattern.compile("\\d{4}").matcher(getCellText(w.getSheetAt(0), 3, 6));
@@ -369,11 +474,17 @@ public class EditorService {
         return 0;
     }
 
+    /**
+     * Pobiera tekstową zawartość komórki.
+     */
     private String getCellText(Sheet s, int r, int c) {
         Row row = s.getRow(r);
         return (row == null || row.getCell(c) == null) ? "" : row.getCell(c).toString();
     }
 
+    /**
+     * Wykrywa pierwszy miesiąc z danymi w pliku ewidencji.
+     */
     private int detectStartMonth(Workbook wb) {
         for (int i = 0; i < wb.getNumberOfSheets(); i++) {
             Sheet s = wb.getSheetAt(i);
@@ -384,6 +495,9 @@ public class EditorService {
         return 1;
     }
 
+    /**
+     * Parsuje tekst w poszukiwaniu wymiaru etatu (np. "1/2", "0.75").
+     */
     private Double parseEtat(String t) {
         try {
             String c = t.replaceAll("[^0-9/.,]", "").replace(",", ".");
@@ -397,10 +511,16 @@ public class EditorService {
         }
     }
 
+    /**
+     * Sprawdza, czy dana data jest polskim świętem.
+     */
     private boolean isPolishHoliday(LocalDate d) {
         return PolishHolidays.isHoliday(d);
     }
 
+    /**
+     * Buduje mapę statusów (etat, wymiar urlopu) dla każdego miesiąca w roku.
+     */
     private List<MonthStatus> buildYearMap(Workbook wb, int y, int sd, List<VacationEvent> evs) {
         List<MonthStatus> map = new ArrayList<>();
         for (int m = 1; m <= 12; m++) {
@@ -432,6 +552,9 @@ public class EditorService {
         return map;
     }
 
+    /**
+     * Klasa wewnętrzna przechowująca status dla danego miesiąca (etat, wymiar urlopu).
+     */
     private static class MonthStatus {
         int monthIndex;
         double fte;

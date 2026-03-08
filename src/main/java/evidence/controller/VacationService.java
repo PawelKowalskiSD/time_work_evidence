@@ -13,8 +13,21 @@ import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 
+/**
+ * Serwis do obliczania wykorzystania urlopu oraz bilansu nadgodzin.
+ * Implementuje logikę związaną z pulą urlopową pracownika.
+ */
 public class VacationService implements VacationController {
-    
+
+    /**
+     * Oblicza wykorzystanie urlopu i stan nadgodzin dla każdego miesiąca w roku.
+     * Tworzy podsumowanie dla każdego miesiąca, uwzględniając urlop zaległy,
+     * roczną pulę urlopową oraz odbiór nadgodzin.
+     *
+     * @param request Obiekt zawierający dane pracownika, jego harmonogramy i nieobecności.
+     * @return Mapa, gdzie kluczem jest numer miesiąca (1-12), a wartością obiekt {@link VacationSummary}
+     *         zawierający szczegółowe podsumowanie dla tego miesiąca.
+     */
     @Override
     public Map<Integer, VacationSummary> calculateVacationUsage(EvidenceRequest request) {
         Map<Integer, VacationSummary> summaries = new HashMap<>();
@@ -56,6 +69,13 @@ public class VacationService implements VacationController {
         return summaries;
     }
 
+    /**
+     * Oblicza całkowitą roczną pulę urlopową w godzinach na podstawie wymiaru etatu i okresów zatrudnienia.
+     * Uwzględnia dodatkowe dni urlopu dla osób niepełnosprawnych.
+     *
+     * @param request Dane wejściowe zawierające informacje o pracowniku i jego harmonogramach.
+     * @return Całkowita liczba godzin urlopu na dany rok.
+     */
     private double calculateTotalYearlyVacationHours(EvidenceRequest request) {
         int baseDays = request.getBaseVacationDays() + (request.isDisabled() ? 10 : 0);
         double totalHours = 0;
@@ -70,6 +90,14 @@ public class VacationService implements VacationController {
         return Math.ceil(totalHours);
     }
 
+    /**
+     * Oblicza liczbę godzin urlopu dla danego okresu zatrudnienia, wymiaru etatu i czasu trwania.
+     *
+     * @param sp Okres harmonogramu z określonym wymiarem etatu.
+     * @param baseDays Bazowy wymiar urlopu w dniach (np. 20 lub 26).
+     * @param monthsDuration Czas trwania okresu w miesiącach.
+     * @return Liczba godzin urlopu proporcjonalna do etatu i czasu trwania okresu.
+     */
     private double calculateHoursForPeriod(SchedulePeriod sp, int baseDays, int monthsDuration) {
         try {
             String[] parts = sp.getEtat().split("/");
@@ -82,6 +110,13 @@ public class VacationService implements VacationController {
         } catch (Exception e) { return 0; }
     }
 
+    /**
+     * Zwraca liczbę zaplanowanych godzin pracy dla danego dnia na podstawie harmonogramu.
+     *
+     * @param periods Lista okresów harmonogramu pracownika.
+     * @param date Data, dla której mają być sprawdzone godziny.
+     * @return Liczba zaplanowanych godzin pracy lub 0, jeśli dzień jest wolny.
+     */
     private double getScheduledHours(List<SchedulePeriod> periods, LocalDate date) {
         for (SchedulePeriod sp : periods) {
             if (sp.covers(date)) {
@@ -94,6 +129,13 @@ public class VacationService implements VacationController {
         return 0;
     }
 
+    /**
+     * Wyszukuje nieobecność dla podanej daty na liście nieobecności.
+     *
+     * @param absences Lista wszystkich nieobecności pracownika.
+     * @param date Data, dla której szukana jest nieobecność.
+     * @return Obiekt {@link AbsenceData} jeśli znaleziono, w przeciwnym razie null.
+     */
     private AbsenceData findAbsence(List<AbsenceData> absences, LocalDate date) {
         for (AbsenceData a : absences) {
             if (a.getDate().equals(date)) return a;

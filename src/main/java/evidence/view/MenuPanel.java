@@ -4,7 +4,17 @@ import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
 
+/**
+ * Panel menu głównego aplikacji.
+ * Wyświetla główne opcje nawigacyjne, takie jak tworzenie nowego dokumentu, edycja,
+ * generowanie karty urlopowej oraz wyjście z aplikacji.
+ */
 class MenuPanel extends JPanel {
+
+    /**
+     * Tworzy panel menu.
+     * @param navigator Obiekt nawigatora do obsługi akcji przycisków.
+     */
     public MenuPanel(ViewNavigator navigator) {
         setLayout(new GridBagLayout());
         setBorder(new EmptyBorder(20, 20, 20, 20));
@@ -31,6 +41,14 @@ class MenuPanel extends JPanel {
         add(buttonContainer, gbc);
     }
 
+    /**
+     * Tworzy i stylizuje przycisk menu.
+     *
+     * @param text Tekst na przycisku.
+     * @param action Akcja do wykonania po kliknięciu.
+     * @param bg Kolor tła przycisku.
+     * @return Ostylowany obiekt {@link JButton}.
+     */
     private JButton createStyledButton(String text, Runnable action, Color bg) {
         JButton btn = new JButton(text);
         btn.setFont(new Font("Segoe UI", Font.BOLD, 16));

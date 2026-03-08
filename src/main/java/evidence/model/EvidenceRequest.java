@@ -4,6 +4,10 @@ import java.io.File;
 import java.time.LocalDate;
 import java.util.List;
 
+/**
+ * Agreguje wszystkie dane wejściowe potrzebne do wygenerowania ewidencji czasu pracy.
+ * Obiekt tej klasy jest przekazywany do kontrolerów w celu przetworzenia.
+ */
 public class EvidenceRequest {
     private File templateFile;
     private String employeeName;
@@ -18,6 +22,22 @@ public class EvidenceRequest {
     private int pastDueVacationHours;
     private int pastDueOvertimeMinutes;
 
+    /**
+     * Tworzy nowe żądanie wygenerowania ewidencji.
+     *
+     * @param templateFile Plik szablonu Excel.
+     * @param employeeName Imię i nazwisko pracownika.
+     * @param year Rok, którego dotyczy ewidencja.
+     * @param startDate Data rozpoczęcia okresu ewidencji.
+     * @param endDate Data zakończenia okresu ewidencji.
+     * @param schedulePeriods Lista okresów harmonogramu pracownika.
+     * @param absences Lista nieobecności pracownika.
+     * @param isDisabled Czy pracownik posiada orzeczenie o niepełnosprawności.
+     * @param baseVacationDays Bazowy wymiar urlopu (20 lub 26 dni).
+     * @param outputDir Katalog docelowy dla wygenerowanego pliku.
+     * @param pastDueVacationDays Liczba dni urlopu zaległego z poprzedniego roku.
+     * @param pastDueOvertimeHours Liczba godzin nadgodzin z poprzedniego roku.
+     */
     public EvidenceRequest(File templateFile, String employeeName, int year,
                            LocalDate startDate, LocalDate endDate,
                            List<SchedulePeriod> schedulePeriods,
