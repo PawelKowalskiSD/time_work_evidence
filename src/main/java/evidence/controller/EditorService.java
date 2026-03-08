@@ -1,6 +1,7 @@
 package evidence.controller;
 
 import evidence.model.VacationEvent;
+import evidence.util.PolishHolidays;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.apache.poi.ss.util.CellRangeAddress;
@@ -209,22 +210,40 @@ public class EditorService {
     private double[] calculateNormParts(int year, int month, double fte) {
         LocalDate firstDay = LocalDate.of(year, month, 1);
         int daysInMonth = firstDay.lengthOfMonth();
-        int fullWeeks = daysInMonth / 7;
-        double fullWeeksHours = (fullWeeks * 5 * POOL_CONVERSION_FACTOR) * fte;
-        double remHours = 0;
-        for (int d = (fullWeeks * 7) + 1; d <= daysInMonth; d++) {
-            LocalDate date = LocalDate.of(year, month, d);
-            if (date.getDayOfWeek() != DayOfWeek.SUNDAY) remHours += POOL_CONVERSION_FACTOR;
-        }
-        double holidayHours = 0;
-        for (int d = 1; d <= daysInMonth; d++) {
-            LocalDate date = LocalDate.of(year, month, d);
-            if (isPolishHoliday(date) && date.getDayOfWeek() != DayOfWeek.SUNDAY) {
-                holidayHours += POOL_CONVERSION_FACTOR;
+        
+        int n = daysInMonth / 7;
+        
+        int d = 0;
+        for (int dayNum = n * 7 + 1; dayNum <= daysInMonth; dayNum++) {
+            LocalDate date = LocalDate.of(year, month, dayNum);
+            DayOfWeek dow = date.getDayOfWeek();
+            if (dow != DayOfWeek.SUNDAY && dow != DayOfWeek.SATURDAY) {
+                d++;
             }
         }
-        double finalI43 = (remHours * fte) - (holidayHours * fte);
-        return new double[]{fullWeeksHours, finalI43};
+        
+        int s = 0;
+        for (int dayNum = 1; dayNum <= daysInMonth; dayNum++) {
+            LocalDate date = LocalDate.of(year, month, dayNum);
+            DayOfWeek dow = date.getDayOfWeek();
+            if (dow != DayOfWeek.SUNDAY && isPolishHoliday(date)) {
+                s++;
+            }
+        }
+        
+        double weeklyNorm = n * 5 * POOL_CONVERSION_FACTOR;
+        double dailyNorm = d * POOL_CONVERSION_FACTOR;
+        double holidayNorm = s * POOL_CONVERSION_FACTOR;
+        
+        double totalHours = (weeklyNorm + dailyNorm - holidayNorm) * fte;
+        
+        double fullWeeksHours = weeklyNorm * fte;
+        fullWeeksHours = Math.ceil(fullWeeksHours * 60) / 60.0;
+        
+        double restHours = totalHours - fullWeeksHours;
+        restHours = Math.ceil(restHours * 60) / 60.0;
+        
+        return new double[]{fullWeeksHours, restHours};
     }
 
     private double calculateComplexPool(List<MonthStatus> map) {
@@ -379,8 +398,7 @@ public class EditorService {
     }
 
     private boolean isPolishHoliday(LocalDate d) {
-        int m = d.getMonthValue(), day = d.getDayOfMonth();
-        return (m == 1 && (day == 1 || day == 6)) || (m == 5 && (day == 1 || day == 3)) || (m == 8 && day == 15) || (m == 11 && (day == 1 || day == 11)) || (m == 12 && (day == 25 || day == 26));
+        return PolishHolidays.isHoliday(d);
     }
 
     private List<MonthStatus> buildYearMap(Workbook wb, int y, int sd, List<VacationEvent> evs) {
