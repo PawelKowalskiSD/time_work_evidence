@@ -34,6 +34,7 @@ public class MainFrame extends JFrame implements ViewNavigator {
 
         MenuPanel menuPanel = new MenuPanel(this);
         GeneratorPanel generatorPanel = new GeneratorPanel(this, excelController);
+
         EditorPanel editorPanel = new EditorPanel(this);
 
         mainPanel.add(menuPanel, VIEW_MENU);
@@ -45,23 +46,32 @@ public class MainFrame extends JFrame implements ViewNavigator {
         cardLayout.show(mainPanel, VIEW_MENU);
     }
 
-    /** {@inheritDoc} */
+    /**
+     * Wyświetla panel menu głównego.
+     */
     @Override
     public void showMenu() { cardLayout.show(mainPanel, VIEW_MENU); }
 
-    /** {@inheritDoc} */
+    /**
+     * Wyświetla panel generatora nowej ewidencji.
+     */
     @Override
     public void showGenerator() { cardLayout.show(mainPanel, VIEW_GENERATOR); }
 
-    /** {@inheritDoc} */
+    /**
+     * Wyświetla panel edytora istniejących plików.
+     */
     @Override
     public void showEditor() { cardLayout.show(mainPanel, VIEW_EDITOR); }
 
-    /** {@inheritDoc} */
+    /**
+     * Wyświetla panel generowania karty urlopowej (w tej implementacji jest to panel edytora).
+     */
     @Override
     public void showVacation() { cardLayout.show(mainPanel, VIEW_VACATION); }
-
-    /** {@inheritDoc} */
+    /**
+     * Zamyka aplikację.
+     */
     @Override
     public void exitApp() { System.exit(0); }
 }

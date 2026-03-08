@@ -31,6 +31,9 @@ public interface VacationController {
         /** Aktualny bilans nadgodzin w minutach. */
         public double overtimeBalance;
 
+        /**
+         * Domyślny konstruktor.
+         */
         public VacationSummary() {}
     }
 }
